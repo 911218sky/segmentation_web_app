@@ -1,3 +1,4 @@
+import logging
 import math
 from typing import Any, List, Optional, Tuple
 
@@ -5,10 +6,33 @@ import numpy as np
 import numpy.typing as npt
 import torch
 import torchvision.transforms as transforms
-from PIL import Image, ImageDraw, ImageFont
 import torchvision.transforms.functional as T
+from PIL import Image, ImageDraw, ImageFont
+import os
 
 from model import UNet3Plus
+
+current_file = os.path.abspath(__file__)
+file_name = os.path.basename(current_file)
+logger = logging.getLogger(file_name)
+
+def release_vram():
+    """
+    釋放 GPU (VRAM) 記憶體並打印釋放的記憶體和目前使用的記憶體。
+    """
+    # 獲取釋放前的 GPU 記憶體使用情況
+    before_allocated = torch.cuda.memory_allocated()
+
+    # 釋放 GPU 緩存記憶體
+    torch.cuda.empty_cache()
+
+    # 獲取釋放後的 GPU 記憶體使用情況
+    after_allocated = torch.cuda.memory_allocated()
+
+    # 計算釋放量
+    freed_allocated = before_allocated - after_allocated
+
+    logger.info(f"釋放了 {freed_allocated / 1024 ** 2:.2f} MB 記憶體，目前使用 {after_allocated / 1024 ** 2:.2f} MB 記憶體")
 
 def infer_batch(
     image_paths: List[str],
@@ -163,7 +187,7 @@ def infer_batch(
             output = torch.sigmoid(output)
             # 生成遮罩
             masks = (output > 0.5).cpu().numpy().astype(np.uint8) * 255
-
+        
         # 處理每張圖片在批次中的推理結果
         for i in range(len(valid_images)):
             mask = masks[i]
@@ -208,6 +232,9 @@ def infer_batch(
 
             # 添加結果
             results.append((image_with_lines, image_with_mask, line_lengths))
+
+    # 釋放 VRAM
+    release_vram()
 
     return results
 
