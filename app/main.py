@@ -210,7 +210,7 @@ def main():
                     compress_results(st.session_state.results, st.session_state.uploaded_files)
 
     # 顯示處理結果
-    if st.session_state.results:
+    if st.session_state.results and not st.session_state.compression_in_progress:
         display_results(st.session_state.results,
                         st.session_state.uploaded_files)
 
