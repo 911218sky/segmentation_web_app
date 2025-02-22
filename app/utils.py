@@ -5,12 +5,11 @@ from typing import Any, List, Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 import torch
+import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as T
 from PIL import Image, ImageDraw, ImageFont
 import os
-
-from model import UNet3Plus
 
 current_file = os.path.abspath(__file__)
 file_name = os.path.basename(current_file)
@@ -36,7 +35,7 @@ def release_vram():
 
 def infer_batch(
     image_paths: List[str],
-    model: UNet3Plus,
+    model: nn.Module,
     batch_size: int = 16,
     fp_precision: str = "fp32",
     num_lines: int = 10,
@@ -373,7 +372,7 @@ def draw_average_length(image: Image.Image, line_lengths: List[float], deviation
             繪製完成的圖片。
     """
     if not line_lengths:
-        print(f"No line lengths provided for image")
+        print("No line lengths provided for image")
         return image
 
     # 計算每個分組的平均長度

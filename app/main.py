@@ -10,8 +10,8 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 import torchvision.transforms as T
 import logging
 import numpy as np
+import torch.nn as nn
 
-from model import UNet3Plus
 from utils import draw_average_length, infer_batch, group_lengths
 
 # 設置日誌配置，方便調試和監控
@@ -32,19 +32,20 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 定義模型存放的目錄和文件名
 MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
-MODEL_FILENAME = 'best_model.pth'
+MODEL_FILENAME = 'model_traced.pt'
 model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
 print(f"模型路徑: {model_path}")
 
 # 定義推理時的圖片轉換流程
 infer_transform: T.Compose = T.Compose([
-    T.Resize((256, 256)),  # 調整圖片大小為 256x256
-    T.ToTensor(),          # 將圖片轉換為張量
+    T.Resize((256, 256)),
+    T.Grayscale(num_output_channels=1), 
+    T.ToTensor(),
 ])
 
 
 @st.cache_resource(show_spinner=False)
-def load_model(model_path: str) -> UNet3Plus:
+def load_model(model_path: str) -> nn.Module:
     """
     加載預訓練的 UNet3Plus 模型並緩存，以避免重複加載。
 
@@ -56,9 +57,7 @@ def load_model(model_path: str) -> UNet3Plus:
     """
     try:
         logger.info(f"正在從 {model_path} 加載模型")
-        model = UNet3Plus().to(device)  # 初始化模型並移動到相應設備
-        checkpoint = torch.load(model_path, map_location=device)  # 加載模型檢查點
-        model.load_state_dict(checkpoint)  # 加載模型參數
+        model = torch.jit.load(model_path).to(device)
         model.eval()  # 設置模型為評估模式
         logger.info("模型加載成功")
         return model
@@ -73,6 +72,8 @@ def load_model(model_path: str) -> UNet3Plus:
 
 
 def initialize_session_state():
+    """初始化或更新 session state"""
+    # 如果是第一次初始化
     if 'uploaded_files' not in st.session_state:
         st.session_state.uploaded_files = []
     if 'results' not in st.session_state:
@@ -91,7 +92,8 @@ def initialize_session_state():
             'deviation_threshold': 0.0,
             'deviation_percent': 0.1
         }
-
+    if 'form_submitted' not in st.session_state:
+        st.session_state.form_submitted = False
 
 def main():
     """
@@ -128,80 +130,80 @@ def main():
             # 使用雙欄佈局提升界面整潔度
             col1, col2 = st.columns(2)
             with col1:
-                st.session_state.params['num_lines'] = st.slider(
+                num_lines = st.slider(
                     "垂直線的數量",
                     min_value=1,
                     max_value=250,
                     value=st.session_state.params['num_lines'],
                     step=1,
-                    key="num_lines",
+                    key="num_lines_slider",
                     help="設定圖片中垂直線的數量，用於血管的測量。"
                 )
-                st.session_state.params['line_width'] = st.slider(
+                line_width = st.slider(
                     "線條寬度",
                     min_value=1,
                     max_value=10,
                     value=st.session_state.params['line_width'],
                     step=1,
-                    key="line_width",
+                    key="line_width_slider",
                     help="設定血管線條的寬度。"
                 )
-                st.session_state.params['min_length_mm'] = st.slider(
+                min_length_mm = st.slider(
                     "最小線條長度 (mm)",
                     min_value=0.1,
                     max_value=10.0,
                     value=st.session_state.params['min_length_mm'],
                     step=0.1,
-                    key="min_length_mm",
+                    key="min_length_mm_slider",
                     help="設定血管線條的最小長度（毫米）。"
                 )
-                st.session_state.params['max_length_mm'] = st.slider(
+                max_length_mm = st.slider(
                     "最大線條長度 (mm)",
                     min_value=4.0,
                     max_value=20.0,
                     value=st.session_state.params['max_length_mm'],
                     step=0.1,
-                    key="max_length_mm",
+                    key="max_length_mm_slider",
                     help="設定血管線條的最大長度（毫米）。"
                 )
             with col2:
-                st.session_state.params['depth_cm'] = st.slider(
+                depth_cm = st.slider(
                     "深度 (cm)",
                     min_value=1.0,
                     max_value=20.0,
                     value=st.session_state.params['depth_cm'],
                     step=0.1,
-                    key="depth_cm",
+                    key="depth_cm_slider",
                     help="設定血管深度（厘米）。"
                 )
-                st.session_state.params['line_length_weight'] = st.slider(
+                line_length_weight = st.slider(
                     "調整線條長度權重",
                     min_value=0.1,
                     max_value=5.0,
                     value=st.session_state.params['line_length_weight'],
                     step=0.05,
-                    key="line_length_weight",
+                    key="line_length_weight_slider",
                     help="調整線條長度在測量中的權重。"
                 )
-                st.session_state.params['deviation_threshold'] = st.slider(
+                deviation_threshold = st.slider(
                     "誤差閾值 (%)",
                     min_value=0.0,
                     max_value=1.0,
                     value=st.session_state.params['deviation_threshold'],
                     step=0.01,
-                    key="deviation_threshold",
+                    key="deviation_threshold_slider",
                     help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)"
                 )
-                st.session_state.params['deviation_percent'] = st.slider(
+                deviation_percent = st.slider(
                     "分組差距百分比 (%)",
                     min_value=0.0,
                     max_value=1.0,
                     value=st.session_state.params['deviation_percent'],
                     step=0.01,
-                    key="deviation_percent",
+                    key="deviation_percent_slider",
                     help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)"
                 )
-                st.session_state.params['line_color'] = st.radio(
+                line_color = st.radio(
                     "線條顏色",
                     options=[
                         ('綠色', (0, 255, 0)),
@@ -212,16 +214,30 @@ def main():
                     ],
                     index=0,
                     format_func=lambda x: x[0],
-                    key="line_color",
+                    key="line_color_radio",
                     help="選擇標記血管的線條顏色。"
                 )[1]
 
             # 提交按鈕
             submitted = st.form_submit_button("開始處理")
             if submitted:
+                st.session_state.form_submitted = True
                 if not st.session_state.uploaded_files:
                     st.warning("⚠️ 請上傳至少一張圖片。")
                 else:
+                    # 更新所有參數
+                    st.session_state.params.update({
+                        'num_lines': num_lines,
+                        'line_width': line_width,
+                        'min_length_mm': min_length_mm,
+                        'max_length_mm': max_length_mm,
+                        'depth_cm': depth_cm,
+                        'line_length_weight': line_length_weight,
+                        'deviation_threshold': deviation_threshold,
+                        'deviation_percent': deviation_percent,
+                        'line_color': line_color
+                    })
+                    
                     # 處理圖片並獲取結果
                     st.session_state.results = process_images(
                         uploaded_files=st.session_state.uploaded_files,
@@ -238,7 +254,7 @@ def main():
 
 def process_images(
     uploaded_files: List[UploadedFile],
-    model: UNet3Plus,
+    model: nn.Module,
     params: Dict[str, Any]
 ) -> List[Tuple[Image.Image, Image.Image, List[float]]]:
     """
