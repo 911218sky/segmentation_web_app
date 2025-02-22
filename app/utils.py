@@ -46,6 +46,7 @@ def infer_batch(
     min_length_mm: float = 1.0,
     max_length_mm: float = 7.0,
     line_length_weight: float = 1,
+    deviation_threshold: float = 0.2,
     transform: Optional[transforms.Compose] = None,
     device: Optional[torch.device] = None,
 ) -> List[Tuple[Optional[Image.Image], Optional[Image.Image], List[float]]]:
@@ -85,6 +86,9 @@ def infer_batch(
 
         line_length_weight (float, optional): 
             線條長度權重，預設為 1。該值用於調整線條長度結果的影響。
+            
+        deviation_threshold (float, optional): 
+            允許的最大偏差比例（例如 0.2 表示 20%）。
 
         transform (transforms.Compose, optional): 
             圖片的預處理轉換管道。若未提供，將使用預設的轉換，包括調整大小和轉換為張量。可以自定義轉換以適應不同的預處理需求。
@@ -219,7 +223,8 @@ def infer_batch(
                 image_height_px=original_height,
                 min_length_mm=min_length_mm,
                 max_length_mm=max_length_mm,
-                line_length_weight=line_length_weight
+                line_length_weight=line_length_weight,
+                deviation_threshold=deviation_threshold
             )
 
             # 繪製遮罩
@@ -308,9 +313,50 @@ def find_mask_at_x(mask_np: npt.NDArray[Any], target_x: int, search_range: int =
     # 找不到合適的遮罩
     return None, None
 
-def draw_average_length(image: Image.Image, line_lengths: List[float]) -> Image.Image:
+def group_lengths(line_lengths: List[float], deviation_percent: float = 0.1) -> List[float]:
     """
-    在圖片上繪製平均長度標註。
+    將線條長度分組，並依照差距百分比分組顯示。
+
+    Args:
+        line_lengths (List[float]): 線條長度列表
+        deviation_percent (float): 分組的差距百分比，預設為10%
+
+    Returns:
+        List[float]: 每個分組的平均長度列表
+    """
+    if not line_lengths:
+        return []
+
+    # 計算每個分組的平均長度
+    length_groups = []
+    sorted_lengths = np.sort(line_lengths)
+    
+    # 根據百分比差距進行分組
+    current_group = []
+    base_length = sorted_lengths[0]
+    
+    for length in sorted_lengths:
+        # 計算與基準長度的差距百分比
+        diff_percent = np.abs(length - base_length) / base_length
+        if diff_percent <= deviation_percent:
+            current_group.append(length)
+        else:
+            # 將當前組的平均值加入分組列表
+            avg = round(np.mean(current_group), 2)
+            length_groups.append(avg)
+            # 開始新的分組
+            current_group = [length]
+            base_length = length
+    # 處理最後一組
+    if current_group:
+        avg = round(np.mean(current_group), 2)
+        length_groups.append(avg)
+
+    return length_groups
+
+def draw_average_length(image: Image.Image, line_lengths: List[float], deviation_percent: float = 0.1) -> Image.Image:
+    """
+    在圖片上繪製平均長度標註，並依照差距百分比分組顯示。
 
     Args:
         image (Image.Image): 
@@ -319,18 +365,29 @@ def draw_average_length(image: Image.Image, line_lengths: List[float]) -> Image.
         line_lengths (List[float]): 
             繪製的所有線條的長度列表，以毫米為單位。
 
+        deviation_percent (float):
+            分組的差距百分比，預設為10%。
+
     Returns:
         Image.Image: 
             繪製完成的圖片。
     """
-    # 計算平均長度
     if not line_lengths:
         print(f"No line lengths provided for image")
         return image
 
-    avg_length = sum(line_lengths) / len(line_lengths)
-    avg_length_text = f"Average Length: {avg_length:.2f} mm"
-    
+    # 計算每個分組的平均長度
+    if deviation_percent > 0:
+        length_groups = group_lengths(line_lengths, deviation_percent)
+        # 將所有分組的長度和數量組合成文字
+        avg_length_text = " or ".join([
+            f"{length:.2f}mm" 
+            for length in length_groups
+        ])
+        avg_length_text = f"Average Length: {avg_length_text}"
+    else:
+        avg_length_text = f"Average Length: {np.mean(line_lengths):.2f}mm"
+        
     # 在處理後的圖片底部繪製平均長度文字
     draw = ImageDraw.Draw(image)
     try:
@@ -466,11 +523,18 @@ def draw_vertical_lines_with_length_mm(
 
     # 計算平均長度
     lengths = [line['mm_length'] for line in potential_lines]
-    mean_length = np.mean(lengths)
+    if deviation_threshold > 0:
+        # 將長度四捨五入到小數點後一位以便分組
+        rounded_lengths = [round(length, 1) for length in lengths]
+        # 找出出現最多次的長度
+        unique_lengths, counts = np.unique(rounded_lengths, return_counts=True)
+        mean_length = unique_lengths[np.argmax(counts)]
+    else:
+        mean_length = np.mean(lengths)
 
-    # 定義允許的長度範圍
-    lower_bound = mean_length * (1 - deviation_threshold)
-    upper_bound = mean_length * (1 + deviation_threshold)
+    # 定義允許的長度範圍(定義為 0 的自動變成 0.2)
+    lower_bound = mean_length * (1 - (0.2 if deviation_threshold == 0 else deviation_threshold))
+    upper_bound = mean_length * (1 + (0.2 if deviation_threshold == 0 else deviation_threshold))
 
     # 過濾掉與平均長度偏差過大的線條
     filtered_lines = [line for line in potential_lines if lower_bound <= line['mm_length'] <= upper_bound]

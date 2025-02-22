@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 from model import UNet3Plus
-from utils import draw_average_length, infer_batch
+from utils import draw_average_length, infer_batch, group_lengths
 
 # 設置日誌配置，方便調試和監控
 logging.basicConfig(level=logging.INFO)
@@ -31,9 +31,10 @@ st.set_page_config(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 定義模型存放的目錄和文件名
-MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
+MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
 MODEL_FILENAME = 'best_model.pth'
 model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
+print(f"模型路徑: {model_path}")
 
 # 定義推理時的圖片轉換流程
 infer_transform: T.Compose = T.Compose([
@@ -80,13 +81,15 @@ def initialize_session_state():
         st.session_state.zip_buffer = None
     if 'params' not in st.session_state:
         st.session_state.params = {
-            'num_lines': 15,
+            'num_lines': 50,
             'line_width': 3,
             'min_length_mm': 1.0,
             'max_length_mm': 7.0,
             'depth_cm': 3.2,
             'line_length_weight': 1.0,
-            'line_color': (0, 255, 0)
+            'line_color': (0, 255, 0),
+            'deviation_threshold': 0.0,
+            'deviation_percent': 0.1
         }
 
 
@@ -128,7 +131,7 @@ def main():
                 st.session_state.params['num_lines'] = st.slider(
                     "垂直線的數量",
                     min_value=1,
-                    max_value=100,
+                    max_value=250,
                     value=st.session_state.params['num_lines'],
                     step=1,
                     key="num_lines",
@@ -179,6 +182,24 @@ def main():
                     step=0.05,
                     key="line_length_weight",
                     help="調整線條長度在測量中的權重。"
+                )
+                st.session_state.params['deviation_threshold'] = st.slider(
+                    "誤差閾值 (%)",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=st.session_state.params['deviation_threshold'],
+                    step=0.01,
+                    key="deviation_threshold",
+                    help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)"
+                )
+                st.session_state.params['deviation_percent'] = st.slider(
+                    "分組差距百分比 (%)",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=st.session_state.params['deviation_percent'],
+                    step=0.01,
+                    key="deviation_percent",
+                    help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)"
                 )
                 st.session_state.params['line_color'] = st.radio(
                     "線條顏色",
@@ -261,19 +282,20 @@ def process_images(
                     depth_cm=params['depth_cm'],
                     line_color=params['line_color'],
                     line_length_weight=params['line_length_weight'],
+                    deviation_threshold=params['deviation_threshold'],
                     transform=infer_transform,
                 )
                 logger.info("圖片推理完成")
 
     except Exception as e:
         logger.exception("處理圖片時發生錯誤")
-        st.error(f"處理時發生錯誤: {e}")
+        st.error(f"處理圖片時發生錯誤: {e}")
         return []
 
     # 在處理後的圖片上繪製平均長度標註
     for i, result in enumerate(results):
         results[i] = (draw_average_length(
-            result[0], result[2]), result[1], result[2])
+            result[0], result[2], params['deviation_percent']), result[1], result[2])
 
     return results
 
@@ -362,9 +384,16 @@ def display_results(results: List[Tuple[Image.Image, Image.Image, List[float]]],
             if processed_img:
                 st.image(processed_img, caption="處理後的圖像",
                          use_container_width=True)
-                mean_length = np.mean(measurements) if len(
-                    measurements) > 0 else 0
-                st.write(f"平均測量長度: {mean_length:.2f} mm")
+                if len(measurements) > 0:
+                    if st.session_state.params['deviation_percent'] > 0:
+                        mean_lengths = group_lengths(measurements, st.session_state.params['deviation_percent'])
+                        lengths_str = " or ".join([f"{length:.2f} mm" for length in mean_lengths])
+                        st.write(f"平均測量長度: {lengths_str}")
+                    else:
+                        mean_length = np.mean(measurements)
+                        st.write(f"平均測量長度: {mean_length:.2f} mm")
+                else:
+                    st.write("未測量到血管")
             else:
                 st.error(f"處理失敗: {filename}")
 
