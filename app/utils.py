@@ -36,8 +36,8 @@ def release_vram():
 def infer_batch(
     image_paths: List[str],
     model: nn.Module,
-    batch_size: int = 16,
-    fp_precision: str = "fp32",
+    batch_size: int = 32,
+    fp_precision: str = "fp16",
     num_lines: int = 10,
     line_color: Tuple[int, int, int] = (0, 255, 0),
     line_width: int = 2,
@@ -60,7 +60,7 @@ def infer_batch(
             用於推理的預訓練模型。該模型應該是已經訓練好的分割模型實例，用於生成圖片的遮罩。
 
         batch_size (int, optional):
-            每次在 GPU 上推理的圖片數量。預設為 16。
+            每次在 GPU 上推理的圖片數量。預設為 32。
 
         fp_precision (str, optional): 
             模型運行時的浮點精度。可選值為 `"fp16"` 或 `"fp32"`，預設為 `"fp32"`。選擇較低的精度可以節省計算資源，但可能會影響模型的準確性。
@@ -127,8 +127,9 @@ def infer_batch(
     # 定義預設轉換（保持寬高比）
     if transform is None:
         transform: T.Compose = T.Compose([
-            T.Resize((256, 256)),  # 調整圖片大小為 256x256
-            T.ToTensor(),          # 將圖片轉換為張量
+            T.Resize((256, 256)),
+            T.Grayscale(num_output_channels=1), 
+            T.ToTensor(),
         ])
 
     # 計算總批次數

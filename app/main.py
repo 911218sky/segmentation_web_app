@@ -76,11 +76,7 @@ def on_radio_change(state: AppState, key: str) -> None:
             value = st.session_state[key]
             if mean_lengths and value < len(mean_lengths):
                 state.selected_measurements[measurement_key] = mean_lengths[value]
-                # 只在測量值改變時更新狀態
-                if state.results_confirmed:
-                    state.results_confirmed = False
-                    state.measurement_data = None
-                    state.excel_buffer = None
+                # 只在測量值改變時更新狀態，但不重置確認狀態
                 update_streamlit_state(st, state)
 
 def confirm_results(state: AppState) -> None:
@@ -244,7 +240,8 @@ def display_results(state: AppState) -> None:
                             format_func=lambda x: f"{mean_lengths[x]:.2f} mm",
                             key=radio_key,
                             horizontal=True,
-                            on_change=lambda: on_radio_change(state, radio_key)
+                            on_change=lambda: on_radio_change(state, radio_key),
+                            label_visibility="collapsed"  # 隱藏標籤以減少空間
                         )
                         
                         # 更新選中的測量值

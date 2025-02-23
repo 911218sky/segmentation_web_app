@@ -10,7 +10,6 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import logging
-import numpy as np
 
 from utils import infer_batch, draw_average_length, group_lengths
 
