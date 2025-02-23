@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import logging
 
-from utils import infer_batch, draw_average_length, group_lengths
+from utils import infer_batch, draw_average_length
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ def collect_measurement_data(
             selected_measurement = selected_measurements[measurement_key]
             measurement_data.append({
                 "檔名": filename,
-                "平均長度 (mm)": f"{selected_measurement:.2f}"
+                "平均長度 (mm)": selected_measurement
             })
             valid_measurements.append(selected_measurement)
         else:
@@ -167,6 +167,6 @@ def collect_measurement_data(
     if len(valid_measurements) > 0:
         measurement_data.insert(0, {
             "檔名": "全部平均",
-            "平均長度 (mm)": f"{sum(valid_measurements) / len(valid_measurements):.2f}"
+            "平均長度 (mm)": sum(valid_measurements) / len(valid_measurements)
         })
     return measurement_data 
