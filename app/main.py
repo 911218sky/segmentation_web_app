@@ -11,8 +11,15 @@ import torchvision.transforms as T
 import logging
 import numpy as np
 import torch.nn as nn
+import pandas as pd
 
-from utils import draw_average_length, infer_batch, group_lengths
+from utils import group_lengths
+from file_processor import (
+    process_images,
+    create_zip_archive,
+    create_excel_report,
+    collect_measurement_data
+)
 
 # 設置日誌配置，方便調試和監控
 logging.basicConfig(level=logging.INFO)
@@ -30,18 +37,24 @@ st.set_page_config(
 # 檢查是否有可用的 GPU，若沒有則使用 CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 定義模型存放的目錄和文件名
-MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
-MODEL_FILENAME = 'model_traced.pt'
-model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
-print(f"模型路徑: {model_path}")
+@st.cache_data
+def get_model_path():
+    # 定義模型存放的目錄和文件名
+    MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
+    MODEL_FILENAME = 'model_traced.pt'
+    model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
+    print(f"模型路徑: {model_path}")
+    return model_path
 
-# 定義推理時的圖片轉換流程
-infer_transform: T.Compose = T.Compose([
-    T.Resize((256, 256)),
-    T.Grayscale(num_output_channels=1), 
-    T.ToTensor(),
-])
+@st.cache_data
+def get_infer_transform():
+    # 定義推理時的圖片轉換流程
+    infer_transform: T.Compose = T.Compose([
+        T.Resize((256, 256)),
+        T.Grayscale(num_output_channels=1), 
+        T.ToTensor(),
+    ])
+    return infer_transform
 
 
 @st.cache_resource(show_spinner=False)
@@ -94,6 +107,10 @@ def initialize_session_state():
         }
     if 'form_submitted' not in st.session_state:
         st.session_state.form_submitted = False
+    if 'compression_in_progress' not in st.session_state:
+        st.session_state.compression_in_progress = False
+    if 'selected_measurements' not in st.session_state:
+        st.session_state.selected_measurements = {}
 
 def main():
     """
@@ -106,7 +123,8 @@ def main():
     st.write("🔍 此工具可以自動識別並測量圖片中的血管長度。")
 
     # 加載模型，如果模型文件不存在，已在 load_model 中處理錯誤
-    model = load_model(model_path)
+    model = load_model(get_model_path())
+    infer_transform = get_infer_transform()
 
     # 步驟 1：上傳圖片
     st.markdown("## 步驟 1: 上傳圖片")
@@ -125,245 +143,132 @@ def main():
 
     # 步驟 2：調整參數
     st.markdown("## 步驟 2: 設定測量參數")
-    with st.expander("🔧 點擊此處設置參數", expanded=True):
-        with st.form("params_form"):
-            # 使用雙欄佈局提升界面整潔度
-            col1, col2 = st.columns(2)
-            with col1:
-                num_lines = st.slider(
-                    "垂直線的數量",
-                    min_value=1,
-                    max_value=250,
-                    value=st.session_state.params['num_lines'],
-                    step=1,
-                    key="num_lines_slider",
-                    help="設定圖片中垂直線的數量，用於血管的測量。"
-                )
-                line_width = st.slider(
-                    "線條寬度",
-                    min_value=1,
-                    max_value=10,
-                    value=st.session_state.params['line_width'],
-                    step=1,
-                    key="line_width_slider",
-                    help="設定血管線條的寬度。"
-                )
-                min_length_mm = st.slider(
-                    "最小線條長度 (mm)",
-                    min_value=0.1,
-                    max_value=10.0,
-                    value=st.session_state.params['min_length_mm'],
-                    step=0.1,
-                    key="min_length_mm_slider",
-                    help="設定血管線條的最小長度（毫米）。"
-                )
-                max_length_mm = st.slider(
-                    "最大線條長度 (mm)",
-                    min_value=4.0,
-                    max_value=20.0,
-                    value=st.session_state.params['max_length_mm'],
-                    step=0.1,
-                    key="max_length_mm_slider",
-                    help="設定血管線條的最大長度（毫米）。"
-                )
-            with col2:
-                depth_cm = st.slider(
-                    "深度 (cm)",
-                    min_value=1.0,
-                    max_value=20.0,
-                    value=st.session_state.params['depth_cm'],
-                    step=0.1,
-                    key="depth_cm_slider",
-                    help="設定血管深度（厘米）。"
-                )
-                line_length_weight = st.slider(
-                    "調整線條長度權重",
-                    min_value=0.1,
-                    max_value=5.0,
-                    value=st.session_state.params['line_length_weight'],
-                    step=0.05,
-                    key="line_length_weight_slider",
-                    help="調整線條長度在測量中的權重。"
-                )
-                deviation_threshold = st.slider(
-                    "誤差閾值 (%)",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=st.session_state.params['deviation_threshold'],
-                    step=0.01,
-                    key="deviation_threshold_slider",
-                    help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)"
-                )
-                deviation_percent = st.slider(
-                    "分組差距百分比 (%)",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=st.session_state.params['deviation_percent'],
-                    step=0.01,
-                    key="deviation_percent_slider",
-                    help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)"
-                )
-                line_color = st.radio(
-                    "線條顏色",
-                    options=[
-                        ('綠色', (0, 255, 0)),
-                        ('紅色', (255, 0, 0)),
-                        ('藍色', (0, 0, 255)),
-                        ('黃色', (255, 255, 0)),
-                        ('白色', (255, 255, 255)),
-                    ],
-                    index=0,
-                    format_func=lambda x: x[0],
-                    key="line_color_radio",
-                    help="選擇標記血管的線條顏色。"
-                )[1]
+    with st.form("params_form"):
+        # 使用雙欄佈局提升界面整潔度
+        col1, col2 = st.columns(2)
+        with col1:
+            num_lines = st.slider(
+                "垂直線的數量",
+                min_value=1,
+                max_value=250,
+                value=st.session_state.params['num_lines'],
+                step=1,
+                key="num_lines_slider",
+                help="設定圖片中垂直線的數量，用於血管的測量。"
+            )
+            line_width = st.slider(
+                "線條寬度",
+                min_value=1,
+                max_value=10,
+                value=st.session_state.params['line_width'],
+                step=1,
+                key="line_width_slider",
+                help="設定血管線條的寬度。"
+            )
+            min_length_mm = st.slider(
+                "最小線條長度 (mm)",
+                min_value=0.1,
+                max_value=10.0,
+                value=st.session_state.params['min_length_mm'],
+                step=0.1,
+                key="min_length_mm_slider",
+                help="設定血管線條的最小長度（毫米）。"
+            )
+            max_length_mm = st.slider(
+                "最大線條長度 (mm)",
+                min_value=4.0,
+                max_value=20.0,
+                value=st.session_state.params['max_length_mm'],
+                step=0.1,
+                key="max_length_mm_slider",
+                help="設定血管線條的最大長度（毫米）。"
+            )
+        with col2:
+            depth_cm = st.slider(
+                "深度 (cm)",
+                min_value=1.0,
+                max_value=20.0,
+                value=st.session_state.params['depth_cm'],
+                step=0.1,
+                key="depth_cm_slider",
+                help="設定血管深度（厘米）。"
+            )
+            line_length_weight = st.slider(
+                "調整線條長度權重",
+                min_value=0.1,
+                max_value=5.0,
+                value=st.session_state.params['line_length_weight'],
+                step=0.05,
+                key="line_length_weight_slider",
+                help="調整線條長度在測量中的權重。"
+            )
+            deviation_threshold = st.slider(
+                "誤差閾值 (%)",
+                min_value=0.0,
+                max_value=1.0,
+                value=st.session_state.params['deviation_threshold'],
+                step=0.01,
+                key="deviation_threshold_slider",
+                help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)"
+            )
+            deviation_percent = st.slider(
+                "分組差距百分比 (%)",
+                min_value=0.0,
+                max_value=1.0,
+                value=st.session_state.params['deviation_percent'],
+                step=0.01,
+                key="deviation_percent_slider",
+                help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)"
+            )
+            line_color = st.radio(
+                "線條顏色",
+                options=[
+                    ('綠色', (0, 255, 0)),
+                    ('紅色', (255, 0, 0)),
+                    ('藍色', (0, 0, 255)),
+                    ('黃色', (255, 255, 0)),
+                    ('白色', (255, 255, 255)),
+                ],
+                index=0,
+                format_func=lambda x: x[0],
+                key="line_color_radio",
+                help="選擇標記血管的線條顏色。"
+            )[1]
 
-            # 提交按鈕
-            submitted = st.form_submit_button("開始處理")
-            if submitted:
-                st.session_state.form_submitted = True
-                if not st.session_state.uploaded_files:
-                    st.warning("⚠️ 請上傳至少一張圖片。")
-                else:
-                    # 更新所有參數
-                    st.session_state.params.update({
-                        'num_lines': num_lines,
-                        'line_width': line_width,
-                        'min_length_mm': min_length_mm,
-                        'max_length_mm': max_length_mm,
-                        'depth_cm': depth_cm,
-                        'line_length_weight': line_length_weight,
-                        'deviation_threshold': deviation_threshold,
-                        'deviation_percent': deviation_percent,
-                        'line_color': line_color
-                    })
-                    
-                    # 處理圖片並獲取結果
-                    st.session_state.results = process_images(
-                        uploaded_files=st.session_state.uploaded_files,
-                        model=model,
-                        params=st.session_state.params
-                    )
-                    compress_results(st.session_state.results, st.session_state.uploaded_files)
+        # 提交按鈕
+        submitted = st.form_submit_button("開始測量")
+        if submitted:
+            st.session_state.form_submitted = True
+            if not st.session_state.uploaded_files:
+                st.warning("⚠️ 請上傳至少一張圖片。")
+            else:
+                # 更新所有參數
+                st.session_state.params.update({
+                    'num_lines': num_lines,
+                    'line_width': line_width,
+                    'min_length_mm': min_length_mm,
+                    'max_length_mm': max_length_mm,
+                    'depth_cm': depth_cm,
+                    'line_length_weight': line_length_weight,
+                    'deviation_threshold': deviation_threshold,
+                    'deviation_percent': deviation_percent,
+                    'line_color': line_color
+                })
+                
+                # 重新處理圖片並獲取結果
+                st.session_state.results = process_images(
+                    model=model,
+                    uploaded_files=st.session_state.uploaded_files,
+                    params=st.session_state.params,
+                    device=device,
+                    transform=infer_transform
+                )
 
     # 顯示處理結果
-    if st.session_state.results and not st.session_state.compression_in_progress:
+    if st.session_state.results:
         display_results(st.session_state.results,
                         st.session_state.uploaded_files)
 
-
-def process_images(
-    uploaded_files: List[UploadedFile],
-    model: nn.Module,
-    params: Dict[str, Any]
-) -> List[Tuple[Image.Image, Image.Image, List[float]]]:
-    """
-    處理上傳的圖片，進行血管測量並返回結果。
-
-    參數:
-        uploaded_files (List[UploadedFile]): 用戶上傳的圖片文件列表。
-        model (UNet3Plus): 加載好的模型實例。
-        params (Dict[str, Any]): 測量參數設置。
-
-    返回:
-        List[Tuple[Image.Image, Image.Image, List[float]]]: 每張圖片的處理結果，包括原圖、處理後圖像和測量長度。
-    """
-    results = []
-    try:
-        # 使用臨時目錄來存儲上傳的圖片，確保處理後自動刪除
-        with tempfile.TemporaryDirectory() as temp_dir:
-            image_paths = []
-            for idx, uploaded_file in enumerate(uploaded_files):
-                # 獲取文件的擴展名
-                file_extension = uploaded_file.type.split('/')[-1]
-                temp_filename = f"temp_{idx}.{file_extension}"
-                temp_path = os.path.join(temp_dir, temp_filename)
-                # 將上傳的文件寫入臨時目錄
-                with open(temp_path, 'wb') as f:
-                    f.write(uploaded_file.getbuffer())
-                image_paths.append(temp_path)
-
-            # 顯示處理進度提示
-            with st.spinner("處理圖片中，請稍候..."):
-                # 執行批量推理
-                results = infer_batch(
-                    image_paths=image_paths,
-                    model=model,
-                    device=device,
-                    fp_precision="fp16",
-                    num_lines=params['num_lines'],
-                    line_width=params['line_width'],
-                    min_length_mm=params['min_length_mm'],
-                    max_length_mm=params['max_length_mm'],
-                    depth_cm=params['depth_cm'],
-                    line_color=params['line_color'],
-                    line_length_weight=params['line_length_weight'],
-                    deviation_threshold=params['deviation_threshold'],
-                    transform=infer_transform,
-                )
-                logger.info("圖片推理完成")
-
-    except Exception as e:
-        logger.exception("處理圖片時發生錯誤")
-        st.error(f"處理圖片時發生錯誤: {e}")
-        return []
-
-    # 在處理後的圖片上繪製平均長度標註
-    for i, result in enumerate(results):
-        results[i] = (draw_average_length(
-            result[0], result[2], params['deviation_percent']), result[1], result[2])
-
-    return results
-
-def compress_results(
-    results: List[Tuple[Image.Image, Image.Image, List[float]]],
-    uploaded_files: List[UploadedFile],
-):
-    """
-    壓縮處理後的圖片結果。
-    
-    參數:
-        results (List[Tuple[Image.Image, Image.Image, List[float]]]): 處理後的圖片結果。
-        uploaded_files (List[UploadedFile]): 用戶上傳的圖片文件列表。
-    """
-    try:
-        st.session_state.compression_in_progress = True  
-
-        total_files = len(results)
-        progress_bar = st.progress(0)
-        
-        compression_info = st.empty()
-        compression_info.info(f"正在壓縮 {total_files} 張圖片...")
-        
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(
-            zip_buffer,
-            "w",
-            compression=zipfile.ZIP_DEFLATED,
-        ) as zip_file:
-            for idx, (img, _, _) in enumerate(results):
-                if img:
-                    filename = os.path.basename(uploaded_files[idx].name)
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format='PNG')
-                    zip_file.writestr(f"processed_{filename}", img_bytes.getvalue())
-                # 更新進度條
-                progress = (idx + 1) / total_files
-                progress_bar.progress(progress)
-        
-        zip_buffer.seek(0)
-        st.session_state.zip_buffer = zip_buffer
-        
-        progress_bar.empty()
-        compression_info.empty()
-        
-        st.success("圖片壓縮完成")
-    except Exception as e:
-        logger.exception("壓縮圖片時發生錯誤")
-        st.error(f"壓縮圖片時發生錯誤: {e}")
-        st.session_state.zip_buffer = None
-    finally:
-        st.session_state.compression_in_progress = False  # 壓縮完成，設置狀態為 False
 
 def display_results(results: List[Tuple[Image.Image, Image.Image, List[float]]], uploaded_files: List[UploadedFile]):
     """
@@ -379,19 +284,22 @@ def display_results(results: List[Tuple[Image.Image, Image.Image, List[float]]],
         st.warning("沒有可顯示的處理結果。")
         return
 
-    # 提供下載所有處理後的圖片的按鈕
-    if 'zip_buffer' in st.session_state and st.session_state.zip_buffer and st.session_state.zip_buffer.getbuffer().nbytes > 0:
-        zip_buffer = st.session_state.zip_buffer
-        st.download_button(
-            "📥 下載所有處理後的圖片",
-            data=zip_buffer,
-            file_name="processed_images.zip",
-            mime="application/zip",
-            key="download_button",
-            help="點擊此按鈕下載所有處理後的圖片壓縮包。"
-        )
+    # 創建下載按鈕區域
+    zip_col, excel_col = st.columns(2)
+    
+    # ZIP下載按鈕
+    zip_buffer = create_zip_archive(results, uploaded_files)
+    if zip_buffer:
+        with zip_col:
+            st.download_button(
+                "📥 下載所有處理後的圖片",
+                data=zip_buffer,
+                file_name="processed_images.zip",
+                mime="application/zip",
+                help="點擊此按鈕下載所有處理後的圖片壓縮包。"
+            )
 
-    # 使用網格布局，每行顯示兩張圖片
+    # 使用網格布局顯示結果
     cols = st.columns(2)
     for idx, (processed_img, _, measurements) in enumerate(results):
         with cols[idx % 2]:
@@ -400,19 +308,51 @@ def display_results(results: List[Tuple[Image.Image, Image.Image, List[float]]],
             if processed_img:
                 st.image(processed_img, caption="處理後的圖像",
                          use_container_width=True)
+                
                 if len(measurements) > 0:
+                    measurement_key = f"measurement_{filename}_{idx}"
+                    
+                    # 獲取分組後的測量值
                     if st.session_state.params['deviation_percent'] > 0:
                         mean_lengths = group_lengths(measurements, st.session_state.params['deviation_percent'])
-                        lengths_str = " or ".join([f"{length:.2f} mm" for length in mean_lengths])
-                        st.write(f"平均測量長度: {lengths_str}")
                     else:
-                        mean_length = np.mean(measurements)
-                        st.write(f"平均測量長度: {mean_length:.2f} mm")
+                        mean_lengths = [np.mean(measurements)]
+                    
+                    # 顯示選擇按鈕
+                    selected_index = st.radio(
+                        "選擇測量值",
+                        options=range(len(mean_lengths)),
+                        format_func=lambda x: f"{mean_lengths[x]:.2f} mm",
+                        key=f"radio_{measurement_key}",
+                        horizontal=True
+                    )
+                    
+                    # 保存選中的測量值
+                    selected_measurement = mean_lengths[selected_index]
+                    st.session_state.selected_measurements[measurement_key] = selected_measurement
+                    st.write(f"**選擇的測量值: {selected_measurement:.2f} mm**")
                 else:
                     st.write("未測量到血管")
             else:
                 st.error(f"處理失敗: {filename}")
 
+    # Excel下載按鈕 - 移到最後，這樣會在每次選擇改變時更新
+    measurement_data = collect_measurement_data(
+        results,
+        uploaded_files,
+        st.session_state.selected_measurements
+    )
+    if measurement_data:
+        excel_buffer = create_excel_report(measurement_data)
+        if excel_buffer:
+            with excel_col:
+                st.download_button(
+                    label="📊 下載測量結果 Excel",
+                    data=excel_buffer,
+                    file_name="measurement_results.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    help="下載所有圖片的測量結果為Excel檔案"
+                )
 
 if __name__ == '__main__':
     main()

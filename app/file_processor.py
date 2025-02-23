@@ -1,0 +1,154 @@
+import io
+import os
+import tempfile
+import zipfile
+from typing import List, Tuple, Dict, Any, Optional
+import pandas as pd
+import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+from PIL import Image
+import torch
+import torch.nn as nn
+import logging
+import numpy as np
+
+from utils import infer_batch, draw_average_length, group_lengths
+
+# 設置日誌
+logger = logging.getLogger(__name__)
+
+def process_images(
+    model: nn.Module,
+    uploaded_files: List[UploadedFile],
+    params: Dict[str, Any],
+    device: torch.device,
+    transform: Any
+) -> List[Tuple[Image.Image, Image.Image, List[float]]]:
+    """
+    處理上傳的圖片並返回結果。
+    """
+    results = []
+    try:
+        # 使用臨時目錄來存儲圖片數據
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_paths = []
+            for idx, uploaded_file in enumerate(uploaded_files):
+                temp_path = os.path.join(temp_dir, f"temp_{idx}.png")
+                with open(temp_path, 'wb') as f:
+                    f.write(uploaded_file.getvalue())
+                image_paths.append(temp_path)
+
+            # 執行批量推理
+            results = infer_batch(
+                image_paths=image_paths,
+                model=model,
+                device=device,
+                fp_precision="fp16",
+                num_lines=params['num_lines'],
+                line_width=params['line_width'],
+                min_length_mm=params['min_length_mm'],
+                max_length_mm=params['max_length_mm'],
+                depth_cm=params['depth_cm'],
+                line_color=params['line_color'],
+                line_length_weight=params['line_length_weight'],
+                deviation_threshold=params['deviation_threshold'],
+                transform=transform,
+            )
+
+    except Exception as e:
+        logger.exception("處理圖片時發生錯誤")
+        st.error(f"處理圖片時發生錯誤: {e}")
+        return []
+
+    # 在處理後的圖片上繪製平均長度標註
+    for i, result in enumerate(results):
+        if result[0] is not None:
+            results[i] = (
+                draw_average_length(result[0], result[2], params['deviation_percent']),
+                result[1],
+                result[2]
+            )
+
+    return results
+
+def create_zip_archive(
+    results: List[Tuple[Image.Image, Image.Image, List[float]]],
+    uploaded_files: List[UploadedFile]
+) -> Optional[io.BytesIO]:
+    """
+    創建包含處理後圖片的ZIP文件。
+    """
+    try:
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+            for idx, (img, _, _) in enumerate(results):
+                if img:
+                    filename = os.path.basename(uploaded_files[idx].name)
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format='PNG')
+                    zip_file.writestr(f"processed_{filename}", img_bytes.getvalue())
+        
+        zip_buffer.seek(0)
+        return zip_buffer
+    except Exception as e:
+        logger.exception("創建ZIP文件時發生錯誤")
+        st.error(f"創建ZIP文件時發生錯誤: {e}")
+        return None
+
+def create_excel_report(measurement_data: List[Dict[str, str]]) -> Optional[io.BytesIO]:
+    """
+    創建測量結果的Excel報告。
+    """
+    try:
+        # 創建DataFrame
+        df = pd.DataFrame(measurement_data)
+        
+        # 將DataFrame轉換為Excel
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, sheet_name='測量結果', index=False)
+            worksheet = writer.sheets['測量結果']
+            
+            # 設置列寬
+            worksheet.set_column('A:A', 30)  # 檔名列寬
+            worksheet.set_column('B:B', 15)  # 平均長度列寬
+
+        excel_buffer.seek(0)
+        return excel_buffer
+    except Exception as e:
+        logger.exception("創建Excel報告時發生錯誤")
+        st.error(f"創建Excel報告時發生錯誤: {e}")
+        return None
+
+def collect_measurement_data(
+    results: List[Tuple[Image.Image, Image.Image, List[float]]],
+    uploaded_files: List[UploadedFile],
+    selected_measurements: Dict[str, float]
+) -> List[Dict[str, str]]:
+    """
+    收集測量數據用於報告生成。
+    
+    參數:
+        results: 處理結果列表
+        uploaded_files: 上傳的文件列表
+        selected_measurements: 已選擇的測量值字典，鍵為測量鍵，值為選中的測量值
+    """
+    measurement_data: List[Dict[str, str]] = []
+    
+    for idx, (processed_img, _, _) in enumerate(results):
+        filename = os.path.basename(uploaded_files[idx].name)
+        measurement_key = f"measurement_{filename}_{idx}"
+        if measurement_key in selected_measurements:
+            selected_measurement = selected_measurements[measurement_key]
+            measurement_data.append({
+                "檔名": filename,
+                "平均長度 (mm)": f"{selected_measurement:.2f}"
+            })
+        else:
+            status = "未測量到血管" if processed_img else "處理失敗"
+            measurement_data.append({
+                "檔名": filename,
+                "平均長度 (mm)": status
+            })
+    
+    return measurement_data 

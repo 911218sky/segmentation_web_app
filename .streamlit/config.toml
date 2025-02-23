@@ -1,5 +1,7 @@
 [server]
 fileWatcherType = "none"
+port = 3012
+runOnSave = true
 
 [logger]
-level = "info" 
+level = "info"

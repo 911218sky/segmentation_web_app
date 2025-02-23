@@ -543,7 +543,7 @@ def draw_vertical_lines_with_length_mm(
         return image, []
 
     # 收集過濾後的線條長度
-    line_lengths = [line['mm_length'] for line in filtered_lines]
+    line_lengths: List[float] = [line['mm_length'] for line in filtered_lines]
 
     # 繪製過濾後的線條
     for line in filtered_lines:
