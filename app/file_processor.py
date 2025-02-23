@@ -134,6 +134,7 @@ def collect_measurement_data(
         selected_measurements: 已選擇的測量值字典，鍵為測量鍵，值為選中的測量值
     """
     measurement_data: List[Dict[str, str]] = []
+    valid_measurements = []
     
     for idx, (processed_img, _, _) in enumerate(results):
         filename = os.path.basename(uploaded_files[idx].name)
@@ -144,11 +145,17 @@ def collect_measurement_data(
                 "檔名": filename,
                 "平均長度 (mm)": f"{selected_measurement:.2f}"
             })
+            valid_measurements.append(selected_measurement)
         else:
             status = "未測量到血管" if processed_img else "處理失敗"
             measurement_data.append({
                 "檔名": filename,
                 "平均長度 (mm)": status
             })
-    
+            
+    if len(valid_measurements) > 0:
+        measurement_data.insert(0, {
+            "檔名": "全部平均",
+            "平均長度 (mm)": f"{sum(valid_measurements) / len(valid_measurements):.2f}"
+        })
     return measurement_data 
