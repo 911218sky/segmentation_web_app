@@ -1,9 +1,5 @@
-from dataclasses import dataclass, asdict, field
-from typing import Dict, List, Optional, Tuple, Any
-import numpy as np
-from PIL import Image
-from streamlit.runtime.uploaded_file_manager import UploadedFile
-import io
+from dataclasses import dataclass
+from typing import Dict, Tuple, Any
 
 @dataclass
 class ProcessingParams:
@@ -18,49 +14,109 @@ class ProcessingParams:
     deviation_threshold: float = 0.0
     deviation_percent: float = 0.1
 
-@dataclass
 class AppState:
-    """應用程序狀態的數據類"""
-    # 文件和結果
-    uploaded_files: List[UploadedFile] = field(default_factory=list)
-    results: List[Tuple[Optional[Image.Image], Optional[Image.Image], List[float]]] = field(default_factory=list)
-    
-    # 緩存和緩衝區
-    zip_buffer: Optional[io.BytesIO] = None
-    mean_lengths_cache: Dict[str, List[float]] = field(default_factory=dict)
-    excel_buffer: Optional[io.BytesIO] = None
-    
-    # 測量相關
-    selected_measurements: Dict[str, float] = field(default_factory=dict)
-    measurement_data: Optional[List[Dict[str, str]]] = None
-    
-    # 狀態標誌
-    form_submitted: bool = False
-    processing: bool = False
-    results_confirmed: bool = False
-    compression_in_progress: bool = False
-    
-    # 其他
-    last_changed_radio: Optional[str] = None
-    params: ProcessingParams = field(default_factory=ProcessingParams)
+    def __init__(self, st):
+        self.st = st
+        if 'uploaded_files' not in self.st.session_state:
+            self.st.session_state.uploaded_files = []
+            self.st.session_state.results = []
+            self.st.session_state.processing = False
+            self.st.session_state.form_submitted = False
+            self.st.session_state.results_confirmed = False
+            self.st.session_state.selected_measurements = {}
+            self.st.session_state.mean_lengths_cache = {}
+            self.st.session_state.measurement_data = None
+            self.st.session_state.excel_buffer = None
+            self.st.session_state.zip_buffer = None
+            self.st.session_state.params = ProcessingParams()
 
-    def reset_processing_state(self) -> None:
-        """重置處理相關的狀態"""
-        self.processing = False
-        self.results_confirmed = False
-        self.compression_in_progress = False
-        self.measurement_data = None
-        self.excel_buffer = None
-        self.zip_buffer = None
+    @property
+    def uploaded_files(self):
+        return self.st.session_state.uploaded_files
 
-    def reset_file_state(self) -> None:
-        """重置文件相關的狀態"""
-        self.results = []
-        self.zip_buffer = None
-        self.mean_lengths_cache = {}
-        self.selected_measurements = {}
-        self.results_confirmed = False
-        self.excel_buffer = None
+    @uploaded_files.setter
+    def uploaded_files(self, value):
+        self.st.session_state.uploaded_files = value
+
+    @property
+    def results(self):
+        return self.st.session_state.results
+
+    @results.setter
+    def results(self, value):
+        self.st.session_state.results = value
+
+    @property
+    def processing(self):
+        return self.st.session_state.processing
+
+    @processing.setter
+    def processing(self, value):
+        self.st.session_state.processing = value
+
+    @property
+    def form_submitted(self):
+        return self.st.session_state.form_submitted
+
+    @form_submitted.setter
+    def form_submitted(self, value):
+        self.st.session_state.form_submitted = value
+
+    @property
+    def results_confirmed(self):
+        return self.st.session_state.results_confirmed
+
+    @results_confirmed.setter
+    def results_confirmed(self, value):
+        self.st.session_state.results_confirmed = value
+
+    @property
+    def selected_measurements(self):
+        return self.st.session_state.selected_measurements
+
+    @selected_measurements.setter
+    def selected_measurements(self, value):
+        self.st.session_state.selected_measurements = value
+
+    @property
+    def mean_lengths_cache(self):
+        return self.st.session_state.mean_lengths_cache
+
+    @mean_lengths_cache.setter
+    def mean_lengths_cache(self, value):
+        self.st.session_state.mean_lengths_cache = value
+
+    @property
+    def measurement_data(self):
+        return self.st.session_state.measurement_data
+
+    @measurement_data.setter
+    def measurement_data(self, value):
+        self.st.session_state.measurement_data = value
+
+    @property
+    def excel_buffer(self):
+        return self.st.session_state.excel_buffer
+
+    @excel_buffer.setter
+    def excel_buffer(self, value):
+        self.st.session_state.excel_buffer = value
+
+    @property
+    def zip_buffer(self):
+        return self.st.session_state.zip_buffer
+
+    @zip_buffer.setter
+    def zip_buffer(self, value):
+        self.st.session_state.zip_buffer = value
+
+    @property
+    def params(self):
+        return self.st.session_state.params
+
+    @params.setter
+    def params(self, value):
+        self.st.session_state.params = value
 
     def update_params(self, new_params: Dict[str, Any]) -> None:
         """更新處理參數"""
@@ -68,32 +124,17 @@ class AppState:
             if hasattr(self.params, key):
                 setattr(self.params, key, value)
 
-    def to_streamlit_state(self) -> Dict[str, Any]:
-        """將狀態轉換為 Streamlit session_state 格式"""
-        state_dict = asdict(self)
-        # 移除不需要存儲在 session_state 中的字段
-        state_dict['params'] = asdict(self.params)
-        return state_dict
+    def reset_file_state(self) -> None:
+        """重置文件相關的狀態，但保留測量選擇"""
+        self.results = []
+        self.processing = False
+        self.form_submitted = False
+        self.results_confirmed = False
+        self.mean_lengths_cache = {}
+        self.measurement_data = None
+        self.excel_buffer = None
+        self.zip_buffer = None
 
-def initialize_state(st) -> AppState:
-    """初始化應用程序狀態"""
-    state = AppState()
-    
-    # 如果 session_state 中已有數據，則更新狀態
-    for key in state.to_streamlit_state().keys():
-        if key not in st.session_state:
-            st.session_state[key] = state.to_streamlit_state()[key]
-        else:
-            # 更新 AppState 實例中的值
-            if key == 'params':
-                state.params = ProcessingParams(**st.session_state[key])
-            else:
-                setattr(state, key, st.session_state[key])
-    
-    return state
-
-def update_streamlit_state(st, state: AppState) -> None:
-    """更新 Streamlit session_state"""
-    state_dict = state.to_streamlit_state()
-    for key, value in state_dict.items():
-        st.session_state[key] = value 
+    def reset_all(self) -> None:
+        """完全重置所有狀態"""
+        self.__init__(self.st)

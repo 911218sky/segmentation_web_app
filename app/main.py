@@ -15,7 +15,7 @@ from file_processor import (
     create_excel_report,
     collect_measurement_data
 )
-from state_manager import initialize_state, update_streamlit_state, AppState
+from state_manager import AppState
 
 # 設置日誌配置
 logging.basicConfig(level=logging.INFO)
@@ -74,15 +74,11 @@ def on_radio_change(state: AppState, key: str) -> None:
         mean_lengths = state.mean_lengths_cache.get(measurement_key, [])
         if key in st.session_state:
             value = st.session_state[key]
-            if mean_lengths and value < len(mean_lengths):
-                state.selected_measurements[measurement_key] = mean_lengths[value]
-                # 只在測量值改變時更新狀態，但不重置確認狀態
-                update_streamlit_state(st, state)
+            state.selected_measurements[measurement_key] = mean_lengths[value]
 
 def confirm_results(state: AppState) -> None:
     """確認結果並生成報告"""
     state.results_confirmed = True
-    
     # 生成報告
     state.measurement_data = collect_measurement_data(
         state.results,
@@ -94,10 +90,7 @@ def confirm_results(state: AppState) -> None:
     
     # 生成 ZIP 文件
     state.zip_buffer = create_zip_archive(state.results, state.uploaded_files)
-    
-    update_streamlit_state(st, state)
 
-@st.cache_data
 def create_download_buttons(state: AppState) -> List[Tuple[str, Dict[str, Any]]]:
     """創建下載按鈕"""
     buttons = []
@@ -147,10 +140,9 @@ def display_results(state: AppState) -> None:
     if not state.results:
         st.warning("沒有可顯示的處理結果。")
         return
-
+    
     # 確認按鈕和下載區域
     col1, col2, col3 = st.columns([1, 1, 1])
-    
     # 確認按鈕
     with col1:
         if not state.results_confirmed:
@@ -158,11 +150,12 @@ def display_results(state: AppState) -> None:
                 "確認測量結果",
                 type="primary",
                 key="confirm_button",
-                use_container_width=True
+                use_container_width=True,
             ):
                 with st.spinner("正在生成報告..."):
                     confirm_results(state)
-                st.rerun()
+                    # 重新渲染
+                    st.rerun()
         else:
             st.button(
                 "✓ 已確認測量結果",
@@ -217,23 +210,7 @@ def display_results(state: AppState) -> None:
                                 mean_lengths = [np.mean(measurements)]
                             state.mean_lengths_cache[measurement_key] = mean_lengths
                         
-                        # 初始化選中的測量值
-                        if measurement_key not in state.selected_measurements:
-                            state.selected_measurements[measurement_key] = mean_lengths[0]
-                        
-                        # 找到當前選中值的索引
-                        current_value = state.selected_measurements[measurement_key]
-                        current_index = 0
-                        for i, value in enumerate(mean_lengths):
-                            if abs(value - current_value) < 0.001:
-                                current_index = i
-                                break
-                        
-                        # 使用 session state 來管理 radio button 的狀態
-                        if radio_key not in st.session_state:
-                            st.session_state[radio_key] = current_index
-                        
-                        # 顯示選擇按鈕，不設置 index 參數
+                        # 顯示選擇按鈕，設置初始索引
                         selected_index = st.radio(
                             "選擇測量值",
                             options=range(len(mean_lengths)),
@@ -241,7 +218,7 @@ def display_results(state: AppState) -> None:
                             key=radio_key,
                             horizontal=True,
                             on_change=lambda: on_radio_change(state, radio_key),
-                            label_visibility="collapsed"  # 隱藏標籤以減少空間
+                            label_visibility="collapsed",  # 隱藏標籤以減少空間
                         )
                         
                         # 更新選中的測量值
@@ -252,10 +229,10 @@ def display_results(state: AppState) -> None:
                         st.write("未測量到血管")
             else:
                 st.error(f"處理失敗: {filename}")
-
+                
 def main():
     """主函數，負責設置頁面內容和用戶交互"""
-    state = initialize_state(st)
+    state = AppState(st)
 
     # 設置頁面的標題和描述
     st.title("🩺 血管測量工具")
@@ -267,21 +244,33 @@ def main():
 
     # 步驟 1：上傳圖片
     st.markdown("## 步驟 1: 上傳圖片")
+    st.session_state["file_uploader_key"] = 0 if "file_uploader_key" not in st.session_state else st.session_state["file_uploader_key"]
+    
+    if st.button(
+        "🗑️ 清空結果", 
+        type="primary",
+        key="clear_button",
+        help="清空所有處理結果",
+        use_container_width=True
+    ):
+        st.session_state["file_uploader_key"] += 1
+        state.reset_file_state()
+        
     uploaded_files = st.file_uploader(
         "上傳多張圖片進行測量（支援格式：JPG, PNG）",
         accept_multiple_files=True,
         type=["jpg", "jpeg", "png"],
-        key="file_uploader"
+        key=f"file_uploader_{st.session_state['file_uploader_key']}",
     )
 
     # 如果有新的文件上傳，更新狀態
     if uploaded_files and uploaded_files != state.uploaded_files:
         state.uploaded_files = uploaded_files
         state.reset_file_state()
-        update_streamlit_state(st, state)
 
     # 步驟 2：調整參數
     st.markdown("## 步驟 2: 設定測量參數")
+    # 參數設置表單
     with st.form("params_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -291,7 +280,8 @@ def main():
                 max_value=250,
                 value=state.params.num_lines,
                 step=1,
-                help="設定圖片中垂直線的數量，用於血管的測量。"
+                help="設定圖片中垂直線的數量，用於血管的測量。",
+                key="num_lines"
             )
             line_width = st.slider(
                 "線條寬度",
@@ -299,7 +289,8 @@ def main():
                 max_value=10,
                 value=state.params.line_width,
                 step=1,
-                help="設定血管線條的寬度。"
+                help="設定血管線條的寬度。",
+                key="line_width"
             )
             min_length_mm = st.slider(
                 "最小線條長度 (mm)",
@@ -307,7 +298,8 @@ def main():
                 max_value=10.0,
                 value=state.params.min_length_mm,
                 step=0.1,
-                help="設定血管線條的最小長度（毫米）。"
+                help="設定血管線條的最小長度（毫米）。",
+                key="min_length_mm"
             )
             max_length_mm = st.slider(
                 "最大線條長度 (mm)",
@@ -315,7 +307,8 @@ def main():
                 max_value=20.0,
                 value=state.params.max_length_mm,
                 step=0.1,
-                help="設定血管線條的最大長度（毫米）。"
+                help="設定血管線條的最大長度（毫米）。",
+                key="max_length_mm"
             )
         with col2:
             depth_cm = st.slider(
@@ -324,7 +317,8 @@ def main():
                 max_value=20.0,
                 value=state.params.depth_cm,
                 step=0.1,
-                help="設定血管深度（厘米）。"
+                help="設定血管深度（厘米）。",
+                key="depth_cm"
             )
             line_length_weight = st.slider(
                 "調整線條長度權重",
@@ -332,7 +326,8 @@ def main():
                 max_value=5.0,
                 value=state.params.line_length_weight,
                 step=0.05,
-                help="調整線條長度在測量中的權重。"
+                help="調整線條長度在測量中的權重。",
+                key="line_length_weight"
             )
             deviation_threshold = st.slider(
                 "誤差閾值 (%)",
@@ -340,7 +335,8 @@ def main():
                 max_value=1.0,
                 value=state.params.deviation_threshold,
                 step=0.01,
-                help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)"
+                help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)",
+                key="deviation_threshold"
             )
             deviation_percent = st.slider(
                 "分組差距百分比 (%)",
@@ -348,7 +344,8 @@ def main():
                 max_value=1.0,
                 value=state.params.deviation_percent,
                 step=0.01,
-                help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)"
+                help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)",
+                key="deviation_percent"
             )
             line_color = st.radio(
                 "線條顏色",
@@ -361,13 +358,16 @@ def main():
                 ],
                 index=0,
                 format_func=lambda x: x[0],
-                help="選擇標記血管的線條顏色。"
+                help="選擇標記血管的線條顏色。",
+                key="line_color"
             )[1]
 
         # 提交按鈕
         submitted = st.form_submit_button(
             "開始測量" if not state.processing else "處理中...",
-            disabled=state.processing
+            disabled=state.processing,
+            type="primary",
+            use_container_width=True
         )
         
         if submitted:
@@ -390,7 +390,6 @@ def main():
                 
                 # 設置處理狀態
                 state.processing = True
-                update_streamlit_state(st, state)
                 
                 # 顯示進度條
                 with st.spinner('正在處理圖片...'):
@@ -404,7 +403,6 @@ def main():
                         )
                     finally:
                         state.processing = False
-                        update_streamlit_state(st, state)
 
     # 顯示處理結果
     if state.results:
