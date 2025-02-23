@@ -81,9 +81,21 @@ def create_zip_archive(
     try:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+            # 用於追蹤檔名計數
+            filename_count = {}
+            
             for idx, (img, _, _) in enumerate(results):
                 if img:
-                    filename = os.path.basename(uploaded_files[idx].name)
+                    base_filename = os.path.basename(uploaded_files[idx].name)
+                    # 檢查檔名是否已存在
+                    if base_filename in filename_count:
+                        filename_count[base_filename] += 1
+                        name, ext = os.path.splitext(base_filename)
+                        filename = f"{name}_{filename_count[base_filename]}{ext}"
+                    else:
+                        filename_count[base_filename] = 0
+                        filename = base_filename
+                    
                     img_bytes = io.BytesIO()
                     img.save(img_bytes, format='PNG')
                     zip_file.writestr(f"processed_{filename}", img_bytes.getvalue())
