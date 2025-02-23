@@ -167,6 +167,6 @@ def collect_measurement_data(
     if len(valid_measurements) > 0:
         measurement_data.insert(0, {
             "檔名": "全部平均",
-            "平均長度 (mm)": sum(valid_measurements) / len(valid_measurements)
+            "平均長度 (mm)": round(sum(valid_measurements) / len(valid_measurements), 2)
         })
     return measurement_data 

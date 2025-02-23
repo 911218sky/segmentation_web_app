@@ -75,6 +75,10 @@ def on_radio_change(state: AppState, key: str) -> None:
         if key in st.session_state:
             value = st.session_state[key]
             state.selected_measurements[measurement_key] = mean_lengths[value]
+    
+    state.results_confirmed = False
+    state.excel_buffer = None
+    state.zip_buffer = None
 
 def confirm_results(state: AppState) -> None:
     """確認結果並生成報告"""
