@@ -10,8 +10,8 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import logging
-
-from utils import infer_batch, draw_average_length
+from state_manager import ProcessingParams
+from utils import infer_batch, draw_average_length, group_lengths
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -19,12 +19,22 @@ logger = logging.getLogger(__name__)
 def process_images(
     model: nn.Module,
     uploaded_files: List[UploadedFile],
-    params: Dict[str, Any],
+    params: ProcessingParams,
     device: torch.device,
     transform: Any
 ) -> List[Tuple[Image.Image, Image.Image, List[float]]]:
     """
     處理上傳的圖片並返回結果。
+
+    Args:
+        model: 用於推理的模型
+        uploaded_files: 上傳的圖片文件列表
+        params: 處理參數
+        device: 運行設備（CPU/GPU）
+        transform: 圖片轉換函數
+
+    Returns:
+        List[Tuple[Image.Image, Image.Image, List[float]]]: 處理結果列表
     """
     results = []
     try:
@@ -43,14 +53,14 @@ def process_images(
                 model=model,
                 device=device,
                 fp_precision="fp16",
-                num_lines=params['num_lines'],
-                line_width=params['line_width'],
-                min_length_mm=params['min_length_mm'],
-                max_length_mm=params['max_length_mm'],
-                depth_cm=params['depth_cm'],
-                line_color=params['line_color'],
-                line_length_weight=params['line_length_weight'],
-                deviation_threshold=params['deviation_threshold'],
+                num_lines=params.num_lines,
+                line_width=params.line_width,
+                min_length_mm=params.min_length_mm,
+                max_length_mm=params.max_length_mm,
+                depth_cm=params.depth_cm,
+                line_color=params.line_color,
+                line_length_weight=params.line_length_weight,
+                deviation_threshold=params.deviation_threshold,
                 transform=transform,
             )
 
@@ -63,7 +73,7 @@ def process_images(
     for i, result in enumerate(results):
         if result[0] is not None:
             results[i] = (
-                draw_average_length(result[0], result[2], params['deviation_percent']),
+                draw_average_length(result[0], result[2], params.deviation_percent),
                 result[1],
                 result[2]
             )
@@ -154,7 +164,7 @@ def collect_measurement_data(
             selected_measurement = selected_measurements[measurement_key]
             measurement_data.append({
                 "檔名": filename,
-                "平均長度 (mm)": selected_measurement
+                "平均長度 (mm)": float(f"{selected_measurement:.2f}")
             })
             valid_measurements.append(selected_measurement)
         else:
@@ -165,8 +175,12 @@ def collect_measurement_data(
             })
             
     if len(valid_measurements) > 0:
-        measurement_data.insert(0, {
-            "檔名": "全部平均",
-            "平均長度 (mm)": round(sum(valid_measurements) / len(valid_measurements), 2)
-        })
+        grouped_lengths = group_lengths(valid_measurements)
+        if grouped_lengths:
+            # 將所有分組的長度組合成文字
+            avg_length_text = " or ".join([f"{length:.2f}" for length in grouped_lengths])
+            measurement_data.insert(0, {
+                "檔名": "全部平均",
+                "平均長度 (mm)": avg_length_text
+            })
     return measurement_data 

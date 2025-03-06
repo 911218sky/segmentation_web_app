@@ -324,8 +324,7 @@ def group_lengths(line_lengths: List[float], deviation_percent: float = 0.1) -> 
     Returns:
         List[float]: 每個分組的平均長度列表
     """
-    if not line_lengths:
-        return []
+    assert len(line_lengths) > 0, "線條長度列表不能為空"
 
     # 計算每個分組的平均長度
     length_groups = []
@@ -342,14 +341,15 @@ def group_lengths(line_lengths: List[float], deviation_percent: float = 0.1) -> 
             current_group.append(length)
         else:
             # 將當前組的平均值加入分組列表
-            avg = round(np.mean(current_group), 2)
+            avg = np.mean(current_group)
             length_groups.append(avg)
             # 開始新的分組
             current_group = [length]
             base_length = length
+            
     # 處理最後一組
     if current_group:
-        avg = round(np.mean(current_group), 2)
+        avg = np.mean(current_group)
         length_groups.append(avg)
 
     return length_groups
@@ -372,9 +372,7 @@ def draw_average_length(image: Image.Image, line_lengths: List[float], deviation
         Image.Image: 
             繪製完成的圖片。
     """
-    if not line_lengths:
-        print("No line lengths provided for image")
-        return image
+    assert len(line_lengths) > 0, "線條長度列表不能為空"
 
     # 計算每個分組的平均長度
     if deviation_percent > 0:

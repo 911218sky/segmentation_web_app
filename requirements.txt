@@ -5,3 +5,4 @@ torch==2.1.0
 torchvision==0.16.0
 watchdog==3.0.0
 xlsxwriter==3.1.2
+streamlit-local-storage==0.0.3

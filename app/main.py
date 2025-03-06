@@ -6,7 +6,6 @@ import logging
 import numpy as np
 import torch.nn as nn
 import os
-from dataclasses import asdict
 
 from utils import group_lengths
 from file_processor import (
@@ -36,7 +35,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 @st.cache_data
 def get_model_path() -> str:
     MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
-    MODEL_FILENAME = 'model_traced.pt'
+    MODEL_FILENAME = 'model_traced_v2.pt'
     model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
     print(f"模型路徑: {model_path}")
     return model_path
@@ -274,15 +273,17 @@ def main():
 
     # 步驟 2：調整參數
     st.markdown("## 步驟 2: 設定測量參數")
+
     # 參數設置表單
     with st.form("params_form"):
+        st.markdown("### 基本參數")
         col1, col2 = st.columns(2)
         with col1:
             num_lines = st.slider(
                 "垂直線的數量",
                 min_value=1,
                 max_value=250,
-                value=state.params.num_lines,
+                value=int(state.params.num_lines),
                 step=1,
                 help="設定圖片中垂直線的數量，用於血管的測量。",
                 key="num_lines"
@@ -291,7 +292,7 @@ def main():
                 "線條寬度",
                 min_value=1,
                 max_value=10,
-                value=state.params.line_width,
+                value=int(state.params.line_width),
                 step=1,
                 help="設定血管線條的寬度。",
                 key="line_width"
@@ -300,7 +301,7 @@ def main():
                 "最小線條長度 (mm)",
                 min_value=0.1,
                 max_value=10.0,
-                value=state.params.min_length_mm,
+                value=float(state.params.min_length_mm),
                 step=0.1,
                 help="設定血管線條的最小長度（毫米）。",
                 key="min_length_mm"
@@ -309,7 +310,7 @@ def main():
                 "最大線條長度 (mm)",
                 min_value=4.0,
                 max_value=20.0,
-                value=state.params.max_length_mm,
+                value=float(state.params.max_length_mm),
                 step=0.1,
                 help="設定血管線條的最大長度（毫米）。",
                 key="max_length_mm"
@@ -319,7 +320,7 @@ def main():
                 "深度 (cm)",
                 min_value=1.0,
                 max_value=20.0,
-                value=state.params.depth_cm,
+                value=float(state.params.depth_cm),
                 step=0.1,
                 help="設定血管深度（厘米）。",
                 key="depth_cm"
@@ -328,7 +329,7 @@ def main():
                 "調整線條長度權重",
                 min_value=0.1,
                 max_value=5.0,
-                value=state.params.line_length_weight,
+                value=float(state.params.line_length_weight),
                 step=0.05,
                 help="調整線條長度在測量中的權重。",
                 key="line_length_weight"
@@ -337,7 +338,7 @@ def main():
                 "誤差閾值 (%)",
                 min_value=0.0,
                 max_value=1.0,
-                value=state.params.deviation_threshold,
+                value=float(state.params.deviation_threshold),
                 step=0.01,
                 help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)",
                 key="deviation_threshold"
@@ -346,39 +347,46 @@ def main():
                 "分組差距百分比 (%)",
                 min_value=0.0,
                 max_value=1.0,
-                value=state.params.deviation_percent,
+                value=float(state.params.deviation_percent),
                 step=0.01,
                 help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)",
                 key="deviation_percent"
             )
-            line_color = st.radio(
-                "線條顏色",
-                options=[
-                    ('綠色', (0, 255, 0)),
-                    ('紅色', (255, 0, 0)),
-                    ('藍色', (0, 0, 255)),
-                    ('黃色', (255, 255, 0)),
-                    ('白色', (255, 255, 255)),
-                ],
-                index=0,
-                format_func=lambda x: x[0],
-                help="選擇標記血管的線條顏色。",
-                key="line_color"
-            )[1]
 
-        # 提交按鈕
-        submitted = st.form_submit_button(
-            "開始測量" if not state.processing else "處理中...",
-            disabled=state.processing,
-            type="primary",
-            use_container_width=True
-        )
-        
-        if submitted:
-            state.form_submitted = True
-            if not state.uploaded_files:
-                st.warning("⚠️ 請上傳至少一張圖片。")
-            else:
+        st.markdown("### 顯示設定")
+        line_color = st.radio(
+            "線條顏色",
+            options=[
+                ('綠色', (0, 255, 0)),
+                ('紅色', (255, 0, 0)),
+                ('藍色', (0, 0, 255)),
+                ('黃色', (255, 255, 0)),
+                ('白色', (255, 255, 255)),
+            ],
+            index=0,
+            format_func=lambda x: x[0],
+            help="選擇標記血管的線條顏色。",
+            key="line_color",
+            horizontal=True
+        )[1]
+
+        # 參數預設值管理
+        with st.expander("⚙️ 參數預設值管理", expanded=True):
+            preset_name = st.text_input(
+                "預設值名稱",
+                key="preset_name",
+                placeholder="輸入預設值名稱...",
+                label_visibility="visible"
+            )
+            
+            # 保存參數按鈕
+            save_params = st.form_submit_button(
+                "💾 保存當前參數",
+                type="secondary",
+                use_container_width=True
+            )
+
+            if save_params:
                 # 更新參數
                 state.update_params({
                     'num_lines': num_lines,
@@ -391,17 +399,62 @@ def main():
                     'deviation_percent': deviation_percent,
                     'line_color': line_color
                 })
-                
+                if preset_name:
+                    state.save_params(preset_name)
+                else:
+                    st.warning("請輸入預設值名稱")
+
+            # 顯示已保存的預設值
+            saved_presets = state.get_saved_presets()
+            if saved_presets:
+                st.markdown("### 已保存的預設值")
+                for name in saved_presets.keys():
+                    col1, col2, col3 = st.columns([2, 1, 1])
+                    with col1:
+                        st.write(f"**{name}**")
+                    with col2:
+                        if st.form_submit_button(f"📥 載入 {name}"):
+                            state.load_params(name)
+                            st.rerun()
+                    with col3:
+                        if st.form_submit_button(f"🗑️ 刪除 {name}"):
+                            state.delete_preset(name)
+
+        # 提交按鈕
+        st.markdown("### 開始處理")
+        submitted = st.form_submit_button(
+            "開始測量" if not state.processing else "處理中...",
+            disabled=state.processing,
+            type="primary",
+            use_container_width=True
+        )
+        
+        if submitted:
+            state.form_submitted = True
+            if not state.uploaded_files:
+                st.warning("⚠️ 請上傳至少一張圖片。")
+            else:
                 # 設置處理狀態
                 state.processing = True
-                
+                # 更新參數
+                state.update_params({
+                    'num_lines': num_lines,
+                    'line_width': line_width,
+                    'min_length_mm': min_length_mm,
+                    'max_length_mm': max_length_mm,
+                    'depth_cm': depth_cm,
+                    'line_length_weight': line_length_weight,
+                    'deviation_threshold': deviation_threshold,
+                    'deviation_percent': deviation_percent,
+                    'line_color': line_color
+                })
                 # 顯示進度條
                 with st.spinner('正在處理圖片...'):
                     try:
                         state.results = process_images(
                             model=model,
                             uploaded_files=state.uploaded_files,
-                            params=asdict(state.params),
+                            params=state.params,
                             device=device,
                             transform=infer_transform
                         )
