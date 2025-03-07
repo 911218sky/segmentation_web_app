@@ -70,12 +70,15 @@ def process_images(
         return []
 
     # 在處理後的圖片上繪製平均長度標註
-    for i, result in enumerate(results):
-        if result[0] is not None:
+    for i, (img, mask, lengths) in enumerate(results):
+        # 如果沒有測量到血管，則將平均長度設為0
+        if len(lengths) <= 0:
+            lengths = [0]
+        if img is not None:
             results[i] = (
-                draw_average_length(result[0], result[2], params.deviation_percent),
-                result[1],
-                result[2]
+                draw_average_length(img, lengths, params.deviation_percent),
+                mask,
+                lengths
             )
 
     return results

@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 import torchvision.transforms.functional as T
 from PIL import Image, ImageDraw, ImageFont
 import os
+from tqdm import tqdm
 
 current_file = os.path.abspath(__file__)
 file_name = os.path.basename(current_file)
@@ -102,11 +103,10 @@ def infer_batch(
             2. 僅包含繪製線條的遮罩覆蓋圖片。如果處理失敗，為 `None`。
             3. 繪製的所有線條的長度列表，以毫米為單位。如果處理失敗，為空列表。
     """
-    results = []
     total_images = len(image_paths)
     if total_images == 0:
         print("No images to process.")
-        return results
+        return []
 
     # 設置設備
     if device is None:
@@ -134,6 +134,10 @@ def infer_batch(
 
     # 計算總批次數
     num_batches = math.ceil(total_images / batch_size)
+    valid_images = [[] for _ in range(num_batches)] 
+    valid_sizes = [[] for _ in range(num_batches)]
+    valid_paths = [[] for _ in range(num_batches)]
+    masks = []
 
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
@@ -141,105 +145,95 @@ def infer_batch(
         current_batch_paths = image_paths[start_idx:end_idx]
 
         # 加載和預處理當前批次的圖片
-        batch_images = []
-        batch_original_sizes = []
-        valid_batch_indices = []
-        for i, image_path in enumerate(current_batch_paths):
+        for image_path in current_batch_paths:
             try:
+                # 讀取並轉換圖片
                 original_image = Image.open(image_path).convert("RGB")
-                original_width, original_height = original_image.size
-                batch_original_sizes.append((original_width, original_height))
+                original_size = original_image.size
                 transformed_image = transform(original_image)
-                batch_images.append(transformed_image)
-                valid_batch_indices.append(i)
+
+                # 儲存有效的圖片資訊
+                valid_images[batch_idx].append(transformed_image)
+                valid_sizes[batch_idx].append(original_size)
+                valid_paths[batch_idx].append(image_path)
             except Exception as e:
-                print(f"Failed to load or transform image {image_path}: {e}")
-                batch_original_sizes.append((None, None))
-                batch_images.append(None)
+                print(f"無法載入或轉換圖片 {image_path}: {e}")
 
-        # 移除加載失敗的圖片
-        valid_images = []
-        valid_sizes = []
-        valid_paths = []
-        for idx_in_batch, img in enumerate(batch_images):
-            if img is not None:
-                valid_images.append(img)
-                valid_sizes.append(batch_original_sizes[idx_in_batch])
-                valid_paths.append(current_batch_paths[idx_in_batch])
-            else:
-                # 如果圖片加載失敗，記錄為 None
-                results.append((None, None, []))
+    # 推理
+    with torch.no_grad():
+        for batch_idx in tqdm(range(num_batches), desc="Processing batches"):
+            # 堆疊成批次張量
+            input_tensor = torch.stack(valid_images[batch_idx]).to(device)
 
-        if not valid_images:
-            print(
-                f"No valid images in batch {batch_idx + 1}/{num_batches}, skipping.")
-            continue
-
-        # 堆疊成批次張量
-        input_tensor = torch.stack(valid_images).to(device)
-
-        # 將圖像張量的精度與模型匹配
-        if fp_precision == "fp16":
-            input_tensor = input_tensor.half()
-        elif fp_precision == "fp32":
-            input_tensor = input_tensor.float()
-
-        # 推理
-        with torch.no_grad():
+            # 將圖像張量的精度與模型匹配
+            if fp_precision == "fp16":
+                input_tensor = input_tensor.half()
+            elif fp_precision == "fp32":
+                input_tensor = input_tensor.float()
+            
             output = model(input_tensor)
             # 將輸出轉換為0-1之間的值
             output = torch.sigmoid(output)
             # 生成遮罩
-            masks = (output > 0.5).cpu().numpy().astype(np.uint8) * 255
-        
-        # 處理每張圖片在批次中的推理結果
-        for i in range(len(valid_images)):
-            mask = masks[i]
-            original_width, original_height = valid_sizes[i]
-            current_image_path = valid_paths[i]
-
-            # 將遮罩轉回 PIL Image 並縮放回原始尺寸
-            mask_pil = Image.fromarray(mask.squeeze()).resize(
-                (original_width, original_height), Image.NEAREST)
-            mask_np_resized = np.array(mask_pil)
-
-            # 加載原始圖片
-            try:
-                original_image = Image.open(current_image_path).convert("RGB")
-            except Exception as e:
-                print(
-                    f"Failed to load original image {current_image_path}: {e}")
-                results.append((None, None, []))
-                continue
-
-            # 繪製垂直線條並標註長度
-            image_with_lines, line_lengths = draw_vertical_lines_with_length_mm(
-                image=original_image.copy(),
-                mask_np=mask_np_resized,
-                num_lines=num_lines,
-                line_color=line_color,
-                line_width=line_width,
-                depth_cm=depth_cm,
-                image_height_px=original_height,
-                min_length_mm=min_length_mm,
-                max_length_mm=max_length_mm,
-                line_length_weight=line_length_weight,
-                deviation_threshold=deviation_threshold
-            )
-
-            # 繪製遮罩
-            image_with_mask = draw_mask(
-                image=original_image.copy(), 
-                mask_np=mask_np_resized,
-                color=(*line_color, 200),
-                threshold=0.5
-            )
-
-            # 添加結果
-            results.append((image_with_lines, image_with_mask, line_lengths))
-
+            masks.extend((output > 0.5).cpu().numpy().astype(np.uint8) * 255)
+    
     # 釋放 VRAM
     release_vram()
+    
+    # 將 valid_images、valid_sizes 和 valid_paths 展平
+    valid_images = [img for batch in valid_images for img in batch]
+    valid_sizes = [size for batch in valid_sizes for size in batch]
+    valid_paths = [path for batch in valid_paths for path in batch]
+    
+    def process_image(i: int) -> Tuple[Optional[Image.Image], Optional[Image.Image], List[float]]:
+        mask = masks[i]
+        original_width, original_height = valid_sizes[i]
+        current_image_path = valid_paths[i]
+
+        # 將遮罩轉回 PIL Image 並縮放回原始尺寸
+        mask_pil = Image.fromarray(mask.squeeze()).resize(
+            (original_width, original_height), Image.NEAREST)
+        mask_np_resized = np.array(mask_pil)
+
+        # 加載原始圖片
+        try:
+            original_image = Image.open(current_image_path).convert("RGB")
+        except Exception as e:
+            print(
+                f"Failed to load original image {current_image_path}: {e}")
+            return (None, None, [])
+
+        # 繪製垂直線條並標註長度
+        image_with_lines, line_lengths = draw_vertical_lines_with_length_mm(
+            image=original_image.copy(),
+            mask_np=mask_np_resized,
+            num_lines=num_lines,
+            line_color=line_color,
+            line_width=line_width,
+            depth_cm=depth_cm,
+            image_height_px=original_height,
+            min_length_mm=min_length_mm,
+            max_length_mm=max_length_mm,
+            line_length_weight=line_length_weight,
+            deviation_threshold=deviation_threshold
+        )
+
+        # 繪製遮罩
+        image_with_mask = draw_mask(
+            image=original_image.copy(), 
+            mask_np=mask_np_resized,
+            color=(*line_color, 200),
+            threshold=0.5
+        )
+
+        return (image_with_lines, image_with_mask, line_lengths)
+    
+    results = []
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+        futures = [executor.submit(process_image, i) for i in range(len(valid_images))]
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing images"):
+            results.append(future.result())
 
     return results
 

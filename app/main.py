@@ -35,7 +35,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 @st.cache_data
 def get_model_path() -> str:
     MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
-    MODEL_FILENAME = 'model_traced_v2.pt'
+    MODEL_FILENAME = 'model_traced_v3.pt'
     model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
     print(f"模型路徑: {model_path}")
     return model_path
