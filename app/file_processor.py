@@ -85,39 +85,38 @@ def process_images(
 
 def create_zip_archive(
     results: List[Tuple[Image.Image, Image.Image, List[float]]],
-    uploaded_files: List[UploadedFile]
-) -> Optional[io.BytesIO]:
+    uploaded_files: List
+) -> io.BytesIO:
     """
-    創建包含處理後圖片的ZIP文件。
+    將處理後的圖片加入一個 ZIP 壓縮包，並返回包含該 ZIP 文件的 BytesIO 對象。
+
+    參數:
+        results: List of Tuple，其中每個元祖包含 (處理後圖片, 原圖, 其他資訊)
+        uploaded_files: 源上傳文件列表，用來獲取原始檔名
+
+    返回:
+        BytesIO 對象，包含 ZIP 壓縮包的所有內容
     """
-    try:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
-            # 用於追蹤檔名計數
-            filename_count = {}
-            
-            for idx, (img, _, _) in enumerate(results):
-                if img:
-                    base_filename = os.path.basename(uploaded_files[idx].name)
-                    # 檢查檔名是否已存在
-                    if base_filename in filename_count:
-                        filename_count[base_filename] += 1
-                        name, ext = os.path.splitext(base_filename)
-                        filename = f"{name}_{filename_count[base_filename]}{ext}"
-                    else:
-                        filename_count[base_filename] = 0
-                        filename = base_filename
-                    
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, format='PNG')
-                    zip_file.writestr(f"processed_{filename}", img_bytes.getvalue())
-        
-        zip_buffer.seek(0)
-        return zip_buffer
-    except Exception as e:
-        logger.exception("創建ZIP文件時發生錯誤")
-        st.error(f"創建ZIP文件時發生錯誤: {e}")
-        return None
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        filename_count = {}
+        for idx, (img, _, _) in enumerate(results):
+            if img:
+                base_filename = os.path.basename(uploaded_files[idx].name)
+                if base_filename in filename_count:
+                    filename_count[base_filename] += 1
+                    name, ext = os.path.splitext(base_filename)
+                    filename = f"{name}_{filename_count[base_filename]}{ext}"
+                else:
+                    filename_count[base_filename] = 0
+                    filename = base_filename
+
+                img_byte_arr = io.BytesIO()
+                img.save(img_byte_arr, format="JPEG", quality=75, optimize=True)
+                img_byte_arr.seek(0)
+                zip_file.writestr(f"processed_{filename}", img_byte_arr.read())
+    zip_buffer.seek(0)
+    return zip_buffer
 
 def create_excel_report(measurement_data: List[Dict[str, str]]) -> Optional[io.BytesIO]:
     """

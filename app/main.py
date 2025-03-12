@@ -6,6 +6,7 @@ import logging
 import numpy as np
 import torch.nn as nn
 import os
+import time
 
 from utils import group_lengths
 from file_processor import (
@@ -73,7 +74,11 @@ def on_radio_change(state: AppState, key: str) -> None:
         mean_lengths = state.mean_lengths_cache.get(measurement_key, [])
         if key in st.session_state:
             value = st.session_state[key]
-            state.selected_measurements[measurement_key] = mean_lengths[value]
+            if mean_lengths and 0 <= value < len(mean_lengths):
+                state.selected_measurements[measurement_key] = mean_lengths[value]
+            else:
+                logger.warning(f"Invalid index {value} for mean_lengths with key {measurement_key}")
+                st.warning("選擇的測量值無效，請重新選擇。")
     
     state.results_confirmed = False
     state.excel_buffer = None
@@ -92,7 +97,10 @@ def confirm_results(state: AppState) -> None:
         state.excel_buffer = create_excel_report(state.measurement_data)
     
     # 生成 ZIP 文件
+    start_time = time.time()
     state.zip_buffer = create_zip_archive(state.results, state.uploaded_files)
+    end_time = time.time()
+    logger.info(f"生成 ZIP 文件時間: {end_time - start_time:.2f} 秒")
 
 def create_download_buttons(state: AppState) -> List[Tuple[str, Dict[str, Any]]]:
     """創建下載按鈕"""
