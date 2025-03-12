@@ -176,13 +176,10 @@ def collect_measurement_data(
                 "平均長度 (mm)": status
             })
             
-    if len(valid_measurements) > 0:
-        grouped_lengths = group_lengths(valid_measurements)
-        if grouped_lengths:
-            # 將所有分組的長度組合成文字
-            avg_length_text = " or ".join([f"{length:.2f}" for length in grouped_lengths])
-            measurement_data.insert(0, {
-                "檔名": "全部平均",
-                "平均長度 (mm)": avg_length_text
-            })
+    # 將所有分組的長度組合成文字
+    measurement_data.insert(0, {
+        "檔名": "全部平均",
+        "平均長度 (mm)": float(f"{sum(valid_measurements) / len(valid_measurements):.2f}")
+    })
+            
     return measurement_data 
