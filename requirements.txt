@@ -1,8 +1,8 @@
-numpy==1.24.3
-Pillow==10.0.0
-streamlit==1.28.0
-torch==2.1.0
-torchvision==0.16.0
-watchdog==3.0.0
-xlsxwriter==3.1.2
-streamlit-local-storage==0.0.3
+numpy==2.2.3
+pandas==2.2.3
+Pillow==11.1.0
+streamlit==1.42.0
+streamlit_local_storage==0.0.25
+torch==2.6.0+cu126
+torchvision==0.21.0+cu126
+tqdm==4.67.1

@@ -1,7 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Dict, Tuple, Any
 from streamlit_local_storage import LocalStorage
-import copy
 
 @dataclass
 class ProcessingParams:

@@ -1,19 +1,17 @@
-"""
-Configuration settings for the application.
-"""
 from typing import Tuple, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import os
 
 @dataclass
 class ThreadingConfig:
-    max_workers: int = 4  # Number of worker threads for parallel processing
-    chunk_size: int = 2   # Number of images to process in each chunk
+    max_workers: int = os.cpu_count() * 4  # Number of worker threads for parallel processing
     batch_size: int = 4   # Batch size for model inference
 
 @dataclass
 class ModelConfig:
+    model_dir: str = 'models'
     filename: str = 'model_traced_v3.pt'
-    fp_precision: str = 'fp16'  # 'fp16' or 'fp32'
+    fp_precision: str = 'fp16'  # 'fp16' or 'fp32' or 'bf16'
 
 @dataclass
 class ImageConfig:
@@ -22,9 +20,9 @@ class ImageConfig:
 
 @dataclass
 class AppConfig:
-    threading: ThreadingConfig = ThreadingConfig()
-    model: ModelConfig = ModelConfig()
-    image: ImageConfig = ImageConfig()
+    threading: ThreadingConfig = field(default_factory=ThreadingConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)
+    image: ImageConfig = field(default_factory=ImageConfig)
 
     @classmethod
     def get_default(cls) -> 'AppConfig':
@@ -34,7 +32,6 @@ class AppConfig:
         return {
             'threading': {
                 'max_workers': self.threading.max_workers,
-                'chunk_size': self.threading.chunk_size,
                 'batch_size': self.threading.batch_size,
             },
             'model': {

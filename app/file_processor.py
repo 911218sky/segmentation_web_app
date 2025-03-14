@@ -1,5 +1,9 @@
-import io
+import sys
 import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import CONFIG
+
+import io
 import tempfile
 import zipfile
 from typing import List, Tuple, Dict, Any, Optional
@@ -11,7 +15,7 @@ import torch
 import torch.nn as nn
 import logging
 from state_manager import ProcessingParams
-from utils import infer_batch, draw_average_length, group_lengths
+from utils import infer_batch, draw_average_length
 
 # 設置日誌
 logger = logging.getLogger(__name__)
@@ -52,7 +56,8 @@ def process_images(
                 image_paths=image_paths,
                 model=model,
                 device=device,
-                fp_precision="fp16",
+                fp_precision=CONFIG.model.fp_precision,
+                batch_size=CONFIG.threading.batch_size,
                 num_lines=params.num_lines,
                 line_width=params.line_width,
                 min_length_mm=params.min_length_mm,

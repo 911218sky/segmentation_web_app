@@ -1,3 +1,8 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import CONFIG
+
 import logging
 import math
 from typing import Any, List, Optional, Tuple
@@ -9,7 +14,6 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as T
 from PIL import Image, ImageDraw, ImageFont
-import os
 from tqdm import tqdm
 
 current_file = os.path.abspath(__file__)
@@ -118,8 +122,10 @@ def infer_batch(
         model = model.half()
     elif fp_precision == "fp32":
         model = model.float()
+    elif fp_precision == "bf16":
+        model = model.bfloat16()
     else:
-        raise ValueError("無效的 `fp_precision` 值，請選擇 'fp16' 或 'fp32'。")
+        raise ValueError("無效的 `fp_precision` 值，請選擇 'fp16'、'fp32'、'bf16' 或 'fp8'。")
 
     # 設置模型為評估模式
     model.eval()
@@ -230,7 +236,7 @@ def infer_batch(
     
     results = []
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=CONFIG.threading.max_workers) as executor:
         futures = [executor.submit(process_image, i) for i in range(len(valid_images))]
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing images"):
             results.append(future.result())

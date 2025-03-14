@@ -1,3 +1,8 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import CONFIG
+
 from typing import List, Tuple, Dict, Any
 import torch
 import streamlit as st
@@ -5,7 +10,6 @@ import torchvision.transforms as T
 import logging
 import numpy as np
 import torch.nn as nn
-import os
 import time
 
 from utils import group_lengths
@@ -16,6 +20,10 @@ from file_processor import (
     collect_measurement_data
 )
 from state_manager import AppState
+from i18n.language_manager import LanguageManager
+
+# 初始化語言管理器
+lang_manager = LanguageManager()
 
 # 設置日誌配置
 logging.basicConfig(level=logging.INFO)
@@ -23,29 +31,29 @@ current_file = os.path.abspath(__file__)
 file_name = os.path.basename(current_file)
 logger = logging.getLogger(file_name)
 
-# 設置 Streamlit 頁面配置
+# 檢查是否有可用的 GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# 設置 Streamlit 頁面配置 - 必須是第一個 Streamlit 命令
 st.set_page_config(
-    page_title="🩺 血管測量工具 v0.2",
+    page_title=lang_manager.get_text("page_title"),
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# 檢查是否有可用的 GPU
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 @st.cache_data
 def get_model_path() -> str:
-    MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models')
-    MODEL_FILENAME = 'model_traced_v3.pt'
-    model_path = os.path.join(MODEL_DIR, MODEL_FILENAME)
+    MODEL_DIR = CONFIG.model.model_dir
+    MODEL_FILENAME = CONFIG.model.filename
+    model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), MODEL_DIR, MODEL_FILENAME)
     print(f"模型路徑: {model_path}")
     return model_path
 
 @st.cache_data
 def get_infer_transform() -> T.Compose:
     return T.Compose([
-        T.Resize((256, 256)),
-        T.Grayscale(num_output_channels=1), 
+        T.Resize(CONFIG.image.size),
+        T.Grayscale(num_output_channels=CONFIG.image.channels), 
         T.ToTensor(),
     ])
 
@@ -127,29 +135,29 @@ def create_download_buttons(state: AppState) -> List[Tuple[str, Dict[str, Any]]]
     # Excel下載按鈕
     if state.excel_buffer and state.results_confirmed:
         buttons.append(("excel", {
-            "label": "📊 下載測量結果 Excel",
+            "label": lang_manager.get_text("download_excel"),
             "data": state.excel_buffer,
             "file_name": "measurement_results.xlsx",
             "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "help": "下載所有圖片的測量結果為Excel檔案",
+            "help": lang_manager.get_text("download_excel_help"),
             "use_container_width": True
         }))
     else:
         buttons.append(("disabled_excel", {
-            "label": "📊 下載測量結果 Excel",
+            "label": lang_manager.get_text("download_excel"),
             "disabled": True,
-            "help": "請先確認測量結果才能下載",
+            "help": lang_manager.get_text("download_disabled_help"),
             "use_container_width": True
         }))
     
     return buttons
 
-def display_results(state: AppState) -> None:
+def display_results(state: AppState, lang_manager: LanguageManager) -> None:
     """顯示處理後的圖片結果並提供下載功能"""
-    st.markdown("## 處理結果")
+    st.markdown(lang_manager.get_text("results_title"))
 
     if not state.results:
-        st.warning("沒有可顯示的處理結果。")
+        st.warning(lang_manager.get_text("no_results"))
         return
     
     # 確認按鈕和下載區域
@@ -158,41 +166,59 @@ def display_results(state: AppState) -> None:
     with col1:
         if not state.results_confirmed:
             if st.button(
-                "確認測量結果",
+                lang_manager.get_text("confirm_results"),
                 type="primary",
                 key="confirm_button",
                 use_container_width=True,
             ):
-                with st.spinner("正在生成報告..."):
+                with st.spinner(lang_manager.get_text("generating_report")):
                     confirm_results(state)
-                    # 重新渲染
                     st.rerun()
         else:
             st.button(
-                "✓ 已確認測量結果",
+                lang_manager.get_text("results_confirmed"),
                 type="secondary",
                 disabled=True,
                 key="confirm_button",
                 use_container_width=True
             )
     
-    # 創建下載按鈕
-    buttons = create_download_buttons(state)
+    # 下載按鈕
+    with col2:
+        if state.results_confirmed and state.zip_buffer:
+            st.download_button(
+                label=lang_manager.get_text("download_images"),
+                data=state.zip_buffer,
+                file_name="processed_images.zip",
+                mime="application/zip",
+                help=lang_manager.get_text("download_images_help"),
+                use_container_width=True
+            )
+        else:
+            st.button(
+                label=lang_manager.get_text("download_images"),
+                disabled=True,
+                help=lang_manager.get_text("download_disabled_help"),
+                use_container_width=True
+            )
     
-    # 顯示下載按鈕
-    for (button_type, button_args) in buttons:
-        if button_type == "zip":
-            with col2:
-                st.download_button(**button_args)
-        elif button_type == "disabled_zip":
-            with col2:
-                st.button(**button_args)
-        elif button_type == "excel":
-            with col3:
-                st.download_button(**button_args)
-        elif button_type == "disabled_excel":
-            with col3:
-                st.button(**button_args)
+    with col3:
+        if state.excel_buffer and state.results_confirmed:
+            st.download_button(
+                label=lang_manager.get_text("download_excel"),
+                data=state.excel_buffer,
+                file_name="measurement_results.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                help=lang_manager.get_text("download_excel_help"),
+                use_container_width=True
+            )
+        else:
+            st.button(
+                label=lang_manager.get_text("download_excel"),
+                disabled=True,
+                help=lang_manager.get_text("download_disabled_help"),
+                use_container_width=True
+            )
 
     st.markdown("---")
 
@@ -203,16 +229,14 @@ def display_results(state: AppState) -> None:
             filename = os.path.basename(state.uploaded_files[idx].name)
             st.markdown(f"### {filename}")
             if processed_img:
-                # 使用 st.container 來減少重新渲染
                 with st.container():
-                    st.image(processed_img, caption="處理後的圖像",
+                    st.image(processed_img, caption=lang_manager.get_text("processed_image"),
                             use_container_width=True)
                     
                     if len(measurements) > 0:
                         measurement_key = f"measurement_{filename}_{idx}"
                         radio_key = f"radio_{measurement_key}"
                         
-                        # 獲取分組後的測量值並緩存
                         mean_lengths = state.mean_lengths_cache.get(measurement_key)
                         if mean_lengths is None:
                             if state.params.deviation_percent > 0:
@@ -221,54 +245,56 @@ def display_results(state: AppState) -> None:
                                 mean_lengths = [np.mean(measurements)]
                             state.mean_lengths_cache[measurement_key] = mean_lengths
                         
-                        # 顯示選擇按鈕，設置初始索引
                         selected_index = st.radio(
-                            "選擇測量值",
+                            lang_manager.get_text("select_measurement"),
                             options=range(len(mean_lengths)),
                             format_func=lambda x: f"{mean_lengths[x]:.2f} mm",
                             key=radio_key,
                             horizontal=True,
                             on_change=lambda: on_radio_change(state, radio_key),
-                            label_visibility="collapsed",  # 隱藏標籤以減少空間
+                            label_visibility="collapsed",
                         )
                         
-                        # 更新選中的測量值
                         selected_measurement = mean_lengths[selected_index]
                         state.selected_measurements[measurement_key] = selected_measurement
-                        st.write(f"**選擇的測量值: {selected_measurement:.2f} mm**")
+                        st.write(lang_manager.get_text("selected_measurement").format(selected_measurement))
                     else:
-                        st.write("未測量到血管")
+                        st.write(lang_manager.get_text("no_vessel_detected"))
             else:
-                st.error(f"處理失敗: {filename}")
-                
+                st.error(lang_manager.get_text("processing_failed").format(filename))
+
 def main():
     """主函數，負責設置頁面內容和用戶交互"""
     state = AppState(st)
 
+    # 添加語言選擇器到側邊欄
+    with st.sidebar:
+        lang_manager.get_language_selector()
+
     # 設置頁面的標題和描述
-    st.title("🩺 血管測量工具")
-    st.write("🔍 此工具可以自動識別並測量圖片中的血管長度。")
+    st.title(lang_manager.get_text("app_title"))
+    st.write(lang_manager.get_text("app_description"))
 
     # 加載模型
     model = load_model(get_model_path())
     infer_transform = get_infer_transform()
 
     # 步驟 1：上傳圖片
-    st.markdown("## 步驟 1: 上傳圖片")
+    st.markdown(lang_manager.get_text("step1_title"))
     st.session_state["file_uploader_key"] = 0 if "file_uploader_key" not in st.session_state else st.session_state["file_uploader_key"]
     
     if st.button(
-        "🗑️ 清空結果", 
+        lang_manager.get_text("clear_results"), 
         type="primary",
         key="clear_button",
-        help="清空所有處理結果",
+        help=lang_manager.get_text("clear_results_help"),
         use_container_width=True
     ):
         st.session_state["file_uploader_key"] += 1
         state.reset_file_state()
         
     uploaded_files = st.file_uploader(
-        "上傳多張圖片進行測量（支援格式：JPG, PNG）",
+        lang_manager.get_text("upload_images"),
         accept_multiple_files=True,
         type=["jpg", "jpeg", "png"],
         key=f"file_uploader_{st.session_state['file_uploader_key']}",
@@ -280,100 +306,100 @@ def main():
         state.reset_file_state()
 
     # 步驟 2：調整參數
-    st.markdown("## 步驟 2: 設定測量參數")
+    st.markdown(lang_manager.get_text("step2_title"))
 
     # 參數設置表單
     with st.form("params_form"):
-        st.markdown("### 基本參數")
+        st.markdown(lang_manager.get_text("basic_params"))
         col1, col2 = st.columns(2)
         with col1:
             num_lines = st.slider(
-                "垂直線的數量",
+                lang_manager.get_text("num_lines"),
                 min_value=1,
                 max_value=250,
                 value=int(state.params.num_lines),
                 step=1,
-                help="設定圖片中垂直線的數量，用於血管的測量。",
+                help=lang_manager.get_text("num_lines_help"),
                 key="num_lines"
             )
             line_width = st.slider(
-                "線條寬度",
+                lang_manager.get_text("line_width"),
                 min_value=1,
                 max_value=10,
                 value=int(state.params.line_width),
                 step=1,
-                help="設定血管線條的寬度。",
+                help=lang_manager.get_text("line_width_help"),
                 key="line_width"
             )
             min_length_mm = st.slider(
-                "最小線條長度 (mm)",
+                lang_manager.get_text("min_length"),
                 min_value=0.1,
                 max_value=10.0,
                 value=float(state.params.min_length_mm),
                 step=0.1,
-                help="設定血管線條的最小長度（毫米）。",
+                help=lang_manager.get_text("min_length_help"),
                 key="min_length_mm"
             )
             max_length_mm = st.slider(
-                "最大線條長度 (mm)",
+                lang_manager.get_text("max_length"),
                 min_value=4.0,
                 max_value=20.0,
                 value=float(state.params.max_length_mm),
                 step=0.1,
-                help="設定血管線條的最大長度（毫米）。",
+                help=lang_manager.get_text("max_length_help"),
                 key="max_length_mm"
             )
         with col2:
             depth_cm = st.slider(
-                "深度 (cm)",
+                lang_manager.get_text("depth"),
                 min_value=1.0,
                 max_value=20.0,
                 value=float(state.params.depth_cm),
                 step=0.1,
-                help="設定血管深度（厘米）。",
+                help=lang_manager.get_text("depth_help"),
                 key="depth_cm"
             )
             line_length_weight = st.slider(
-                "調整線條長度權重",
+                lang_manager.get_text("line_length_weight"),
                 min_value=0.1,
                 max_value=5.0,
                 value=float(state.params.line_length_weight),
                 step=0.05,
-                help="調整線條長度在測量中的權重。",
+                help=lang_manager.get_text("line_length_weight_help"),
                 key="line_length_weight"
             )
             deviation_threshold = st.slider(
-                "誤差閾值 (%)",
+                lang_manager.get_text("deviation_threshold"),
                 min_value=0.0,
                 max_value=1.0,
                 value=float(state.params.deviation_threshold),
                 step=0.01,
-                help="設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)",
+                help=lang_manager.get_text("deviation_threshold_help"),
                 key="deviation_threshold"
             )
             deviation_percent = st.slider(
-                "分組差距百分比 (%)",
+                lang_manager.get_text("deviation_percent"),
                 min_value=0.0,
                 max_value=1.0,
                 value=float(state.params.deviation_percent),
                 step=0.01,
-                help="設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)",
+                help=lang_manager.get_text("deviation_percent_help"),
                 key="deviation_percent"
             )
 
-        st.markdown("### 顯示設定")
+        st.markdown(lang_manager.get_text("display_settings"))
         line_color = st.radio(
-            "線條顏色",
+            lang_manager.get_text("line_color"),
             options=[
-                ('綠色', (0, 255, 0)),
-                ('紅色', (255, 0, 0)),
-                ('藍色', (0, 0, 255)),
-                ('黃色', (255, 255, 0)),
-                ('白色', (255, 255, 255)),
+                (lang_manager.get_text("color_green"), (0, 255, 0)),
+                (lang_manager.get_text("color_red"), (255, 0, 0)),
+                (lang_manager.get_text("color_blue"), (0, 0, 255)),
+                (lang_manager.get_text("color_yellow"), (255, 255, 0)),
+                (lang_manager.get_text("color_white"), (255, 255, 255)),
             ],
             index=0,
             format_func=lambda x: x[0],
-            help="選擇標記血管的線條顏色。",
+            help=lang_manager.get_text("line_color_help"),
             key="line_color",
             horizontal=True
         )[1]
@@ -381,15 +407,15 @@ def main():
         # 參數預設值管理
         with st.expander("⚙️ 參數預設值管理", expanded=True):
             preset_name = st.text_input(
-                "預設值名稱",
+                lang_manager.get_text("preset_name"),
                 key="preset_name",
-                placeholder="輸入預設值名稱...",
+                placeholder=lang_manager.get_text("preset_name_placeholder"),
                 label_visibility="visible"
             )
             
             # 保存參數按鈕
             save_params = st.form_submit_button(
-                "💾 保存當前參數",
+                lang_manager.get_text("save_params"),
                 type="secondary",
                 use_container_width=True
             )
@@ -410,7 +436,7 @@ def main():
                 if preset_name:
                     state.save_params(preset_name)
                 else:
-                    st.warning("請輸入預設值名稱")
+                    st.warning(lang_manager.get_text("preset_name_warning"))
 
             # 顯示已保存的預設值
             saved_presets = state.get_saved_presets()
@@ -429,9 +455,9 @@ def main():
                             state.delete_preset(name)
 
         # 提交按鈕
-        st.markdown("### 開始處理")
+        st.markdown(lang_manager.get_text("start_processing"))
         submitted = st.form_submit_button(
-            "開始測量" if not state.processing else "處理中...",
+            lang_manager.get_text("start_processing") if not state.processing else lang_manager.get_text("processing"),
             disabled=state.processing,
             type="primary",
             use_container_width=True
@@ -440,7 +466,7 @@ def main():
         if submitted:
             state.form_submitted = True
             if not state.uploaded_files:
-                st.warning("⚠️ 請上傳至少一張圖片。")
+                st.warning(lang_manager.get_text("upload_warning"))
             else:
                 # 設置處理狀態
                 state.processing = True
@@ -457,7 +483,7 @@ def main():
                     'line_color': line_color
                 })
                 # 顯示進度條
-                with st.spinner('正在處理圖片...'):
+                with st.spinner(lang_manager.get_text("processing_spinner")):
                     try:
                         state.results = process_images(
                             model=model,
@@ -471,7 +497,7 @@ def main():
 
     # 顯示處理結果
     if state.results:
-        display_results(state)
+        display_results(state, lang_manager)
 
 if __name__ == '__main__':
     main()
