@@ -4,7 +4,7 @@ import os
 
 @dataclass
 class ThreadingConfig:
-    max_workers: int = os.cpu_count() * 4  # Number of worker threads for parallel processing
+    max_workers: int = os.cpu_count() // 2  # Number of worker threads for parallel processing
     batch_size: int = 4   # Batch size for model inference
 
 @dataclass
