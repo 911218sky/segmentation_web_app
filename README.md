@@ -1,4 +1,4 @@
-# 🩺 Vessel Measurement Tool v0.3
+# 🩺 Vessel Measurement Tool v0.2
 
 A vessel measurement tool based on **UNet3Plus** and **Streamlit**, designed for medical image analysis to automatically identify and measure vessel lengths in ultrasound images.
 
