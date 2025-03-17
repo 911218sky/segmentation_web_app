@@ -10,6 +10,11 @@ class TranslationStrings(TypedDict):
     step1_title: str
     step2_title: str
     
+    # Progress stages
+    progress_loading: str
+    progress_inference: str
+    progress_drawing: str
+    
     # File operations
     clear_results: str
     clear_results_help: str
@@ -91,6 +96,11 @@ TRANSLATIONS: Translations = {
         "step1_title": "## 步驟 1: 上傳圖片",
         "step2_title": "## 步驟 2: 設定測量參數",
         
+        # Progress stages
+        "progress_loading": "加载图片中",
+        "progress_inference": "AI分析中",
+        "progress_drawing": "绘制测量线中",
+        
         # File operations
         "clear_results": "🗑️ 清空結果",
         "clear_results_help": "清空所有處理結果",
@@ -168,6 +178,11 @@ TRANSLATIONS: Translations = {
         "step1_title": "## Step 1: Upload Images",
         "step2_title": "## Step 2: Set Measurement Parameters",
         
+        # Progress stages
+        "progress_loading": "Loading Images in progress",
+        "progress_inference": "AI Analysis in progress",
+        "progress_drawing": "Drawing Measurement Lines in progress",
+        
         # File operations
         "clear_results": "🗑️ Clear Results",
         "clear_results_help": "Clear all processing results",
@@ -192,7 +207,7 @@ TRANSLATIONS: Translations = {
         "deviation_threshold": "Deviation Threshold (%)",
         "deviation_threshold_help": "Set acceptable deviation range percentage. Measurements outside this range will be filtered. (0 to disable filtering)",
         "deviation_percent": "Grouping Deviation Percentage (%)",
-        "deviation_percent_help": "Set grouping deviation percentage for similar length lines. (0 to disable grouping)",
+        "deviation_percent_help": "Set the percentage for grouping similar measurements. (0 to disable grouping)",
         
         # Colors
         "line_color": "Line Color",
@@ -218,6 +233,16 @@ TRANSLATIONS: Translations = {
         "processing": "Processing...",
         "processing_spinner": "Processing images...",
         
+        # Messages
+        "no_vessel_detected": "⚠️ No vessel detected in this image.",
+        "no_valid_measurements": "⚠️ No valid measurements after filtering.",
+        "processing_failed": "❌ Failed to process image: {}",
+        
+        # Other UI elements
+        "processed_image": "Processed Image",
+        "select_measurement": "Select Measurement",
+        "selected_measurement": "Selected measurement: {:.2f} mm",
+        
         # Results
         "results_title": "## Results",
         "confirm_results": "Confirm Measurements",
@@ -227,13 +252,8 @@ TRANSLATIONS: Translations = {
         "download_excel": "📊 Download Results Excel",
         "download_excel_help": "Download measurement results as Excel file",
         "download_disabled_help": "Please confirm measurements first",
-        "select_measurement": "Select Measurement",
-        "selected_measurement": "Selected measurement: {:.2f} mm",
-        "no_vessel_detected": "No vessel detected",
-        "processing_failed": "Processing failed: {}",
         "no_results": "No results to display.",
-        "generating_report": "Generating report...",
-        "processed_image": "Processed image"
+        "generating_report": "Generating report..."
     }
 }
 

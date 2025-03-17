@@ -7,13 +7,13 @@ from .translations import (
 )
 
 class LanguageManager:
-    def __init__(self):
+    def __init__(self, default_language: LanguageCode = "zh_TW"):
+        self.default_language = default_language
         self.languages: Dict[LanguageCode, str] = {
             "zh_TW": "繁體中文",
             "en": "English"
         }
-        if "language" not in st.session_state:
-            st.session_state.language = "zh_TW"
+        st.session_state.language = self.default_language
 
     def get_text(self, key: str) -> str:
         """獲取當前語言的翻譯文本"""
@@ -23,6 +23,8 @@ class LanguageManager:
 
     def get_current_language(self) -> LanguageCode:
         """獲取當前語言代碼"""
+        if "language" not in st.session_state:
+            st.session_state.language = self.default_language
         return st.session_state.language  # type: ignore
 
     def set_language(self, lang: LanguageCode) -> None:
@@ -42,4 +44,6 @@ class LanguageManager:
         )
         if selected_lang != current_lang:
             self.set_language(selected_lang)
-            st.rerun() 
+            st.rerun()
+
+lang_manager = LanguageManager()

@@ -1,6 +1,8 @@
-# 🩺 Vessel Measurement Tool v0.3
+# 🩺 Vessel Measurement Tool v0.2
 
 A vessel measurement tool based on **UNet3Plus** and **Streamlit**, designed for medical image analysis to automatically identify and measure vessel lengths in ultrasound images.
+
+[中文](README_zh.md) | English
 
 ## ✨ Features
 
@@ -21,7 +23,7 @@ A vessel measurement tool based on **UNet3Plus** and **Streamlit**, designed for
 
 ### 1. Clone the Project
 ```bash
-git clone https://github.com/911218sky/segmentation_web_app.git
+git clone https://github.com/yourusername/vessel-measurement-tool.git
 cd vessel-measurement-tool
 ```
 
@@ -120,6 +122,20 @@ vessel-measurement-tool/
 3. **Slow Processing**
    - Check GPU acceleration status
    - Adjust image size or batch size
+
+## 🤝 Contributing
+
+Issues and Pull Requests are welcome to improve the project.
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## 📮 Contact
+
+- Author: [Your Name]
+- Email: [your.email@example.com]
+- GitHub: [Your GitHub Profile]
 
 ## 📝 Changelog
 

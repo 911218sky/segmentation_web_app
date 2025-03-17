@@ -42,6 +42,7 @@ def infer_batch(
     image_paths: List[str],
     model: nn.Module,
     batch_size: int = 32,
+    max_workers: int = CONFIG.threading.max_workers,
     fp_precision: str = "fp16",
     num_lines: int = 10,
     line_color: Tuple[int, int, int] = (0, 255, 0),
@@ -53,19 +54,23 @@ def infer_batch(
     deviation_threshold: float = 0.2,
     transform: Optional[transforms.Compose] = None,
     device: Optional[torch.device] = None,
+    progress_callback: Optional[callable] = None,
 ) -> List[Tuple[Optional[Image.Image], Optional[Image.Image], List[float]]]:
     """
     批次推理多張圖片並返回處理後的圖片、僅包含線條的遮罩覆蓋圖片和線條長度列表。
 
     Args:
         image_paths (List[str]): 
-            圖片的檔案路徑列表。必須提供有效的圖片路徑，以便函數能夠加載並處理圖片。
+            圖片的檔案路徑列表。必須提供有效的圖片路徑，以便函數能夠載入並處理圖片。
 
         model (nn.Module): 
             用於推理的預訓練模型。該模型應該是已經訓練好的分割模型實例，用於生成圖片的遮罩。
 
         batch_size (int, optional):
             每次在 GPU 上推理的圖片數量。預設為 32。
+
+        max_workers (int, optional):
+            最大工作執行緒數，預設為 CONFIG.threading.max_workers。
 
         fp_precision (str, optional): 
             模型運行時的浮點精度。可選值為 `"fp16"` 或 `"fp32"`，預設為 `"fp32"`。選擇較低的精度可以節省計算資源，但可能會影響模型的準確性。
@@ -100,6 +105,12 @@ def infer_batch(
         device (torch.device, optional): 
             運行模型的設備，可以是 CPU 或 GPU。若未提供，將自動選擇可用的 GPU（如果有），否則使用 CPU。
 
+        progress_callback (Optional[callable], optional):
+            進度回調函數，接受三個參數：
+            - stage: 當前階段 ("loading", "inference", "drawing")
+            - current: 當前進度
+            - total: 總進度
+
     Returns:
         List[Tuple[Optional[Image.Image], Optional[Image.Image], List[float], str]]: 
             返回一個列表，其中每個元素是一個包含四個元素的元組：
@@ -109,7 +120,6 @@ def infer_batch(
     """
     total_images = len(image_paths)
     if total_images == 0:
-        print("No images to process.")
         return []
 
     # 設置設備
@@ -145,12 +155,14 @@ def infer_batch(
     valid_paths = [[] for _ in range(num_batches)]
     masks = []
 
+    # 載入圖片階段
+    loaded_images = 0
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, total_images)
         current_batch_paths = image_paths[start_idx:end_idx]
 
-        # 加載和預處理當前批次的圖片
+        # 載入和預處理當前批次的圖片
         for image_path in current_batch_paths:
             try:
                 # 讀取並轉換圖片
@@ -162,12 +174,20 @@ def infer_batch(
                 valid_images[batch_idx].append(transformed_image)
                 valid_sizes[batch_idx].append(original_size)
                 valid_paths[batch_idx].append(image_path)
+                
+                loaded_images += 1
+                if progress_callback:
+                    progress_callback("loading", loaded_images, total_images)
             except Exception as e:
-                print(f"無法載入或轉換圖片 {image_path}: {e}")
+                logger.error(f"無法載入或轉換圖片 {image_path}: {e}")
 
-    # 推理
+    # 推理階段
+    processed_images = 0
     with torch.no_grad():
-        for batch_idx in tqdm(range(num_batches), desc="Processing batches"):
+        for batch_idx in range(num_batches):
+            if not valid_images[batch_idx]:  # 跳過空批次
+                continue
+                
             # 堆疊成批次張量
             input_tensor = torch.stack(valid_images[batch_idx]).to(device)
 
@@ -182,6 +202,10 @@ def infer_batch(
             output = torch.sigmoid(output)
             # 生成遮罩
             masks.extend((output > 0.5).cpu().numpy().astype(np.uint8) * 255)
+            
+            processed_images += len(valid_images[batch_idx])
+            if progress_callback:
+                progress_callback("inference", processed_images, total_images)
     
     # 釋放 VRAM
     release_vram()
@@ -201,12 +225,11 @@ def infer_batch(
             (original_width, original_height), Image.NEAREST)
         mask_np_resized = np.array(mask_pil)
 
-        # 加載原始圖片
+        # 載入原始圖片
         try:
             original_image = Image.open(current_image_path).convert("RGB")
         except Exception as e:
-            print(
-                f"Failed to load original image {current_image_path}: {e}")
+            logger.error(f"無法載入原始圖片 {current_image_path}: {e}")
             return (None, None, [])
 
         # 繪製垂直線條並標註長度
@@ -236,10 +259,12 @@ def infer_batch(
     
     results = []
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=CONFIG.threading.max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_image, i) for i in range(len(valid_images))]
-        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing images"):
+        for i, future in enumerate(concurrent.futures.as_completed(futures)):
             results.append(future.result())
+            if progress_callback:
+                progress_callback("drawing", i + 1, len(valid_images))
 
     return results
 
@@ -324,35 +349,32 @@ def group_lengths(line_lengths: List[float], deviation_percent: float = 0.1) -> 
     Returns:
         List[float]: 每個分組的平均長度列表
     """
-    assert len(line_lengths) > 0, "線條長度列表不能為空"
+    if not line_lengths:
+        return []
 
-    # 計算每個分組的平均長度
-    length_groups = []
-    sorted_lengths = np.sort(line_lengths)
+    # 轉換為 numpy array 並過濾 0
+    lengths = np.array(line_lengths)
+    lengths = lengths[lengths != 0]
     
-    # 根據百分比差距進行分組
-    current_group = []
-    base_length = sorted_lengths[0]
-    
-    for length in sorted_lengths:
-        # 計算與基準長度的差距百分比
-        diff_percent = np.abs(length - base_length) / base_length
-        if diff_percent <= deviation_percent:
-            current_group.append(length)
-        else:
-            # 將當前組的平均值加入分組列表
-            avg = np.mean(current_group)
-            length_groups.append(avg)
-            # 開始新的分組
-            current_group = [length]
-            base_length = length
-            
-    # 處理最後一組
-    if current_group:
-        avg = np.mean(current_group)
-        length_groups.append(avg)
+    if len(lengths) == 0:
+        return []
 
-    return length_groups
+    # 排序
+    sorted_lengths = np.sort(lengths)
+    
+    # 計算相鄰元素的差距百分比
+    diffs = np.abs(np.diff(sorted_lengths) / sorted_lengths[:-1])
+    
+    # 找出差距大於閾值的位置，這些位置就是分組的邊界
+    group_boundaries = np.where(diffs > deviation_percent)[0] + 1
+    
+    # 使用 split 根據邊界分組
+    groups = np.split(sorted_lengths, group_boundaries)
+    
+    # 計算每組的平均值
+    means = np.array([np.mean(group) for group in groups])
+    
+    return means.tolist()
 
 def draw_average_length(image: Image.Image, line_lengths: List[float], deviation_percent: float = 0.1) -> Image.Image:
     """
@@ -434,7 +456,7 @@ def draw_vertical_lines_with_length_mm(
     font_size: int = 16,
     background_padding: int = 5,
     search_range: int = 5,
-    deviation_threshold: float = 0.2  # 允許的最大偏差比例（例如 0.2 表示 20%）
+    deviation_threshold: float = 0.2
 ) -> Tuple[Image.Image, List[float]]:
     """
     在圖片上繪製垂直線條並標註其長度（毫米）。
@@ -450,15 +472,15 @@ def draw_vertical_lines_with_length_mm(
         image_height_px: 圖片高度（像素）
         min_length_mm: 最小可接受的線條長度（毫米）
         max_length_mm: 最大可接受的線條長度（毫米）
-        line_length_weight: 線條長度權重，用於調整線條長度結果的影響
+        line_length_weight: 線條長度權重，用於調整結果
         font_path: 字型檔案路徑
         font_size: 字型大小
         background_padding: 文字背景的內邊距
         search_range: 搜尋遮罩範圍的像素數
-        deviation_threshold: 允許的最大偏差比例（默認為 20%）
+        deviation_threshold: 允許的最大偏差比例（預設20%）
 
     Returns:
-        image (Image.Image): 繪製完成的影像。
+        image (Image.Image): 繪製完成的影像（RGB 模式）。
         line_lengths (List[float]): 所有繪製線條的實際毫米長度。
     """
 
@@ -467,7 +489,7 @@ def draw_vertical_lines_with_length_mm(
 
     # 確保遮罩中有非零點
     if not np.any(mask_np > 0):
-        print("No mask found.")
+        logger.debug("未找到遮罩。")
         return image, []
 
     # 找到遮罩範圍
@@ -477,74 +499,74 @@ def draw_vertical_lines_with_length_mm(
 
     # 若範圍過小，無法繪製指定數量的線條
     if right_x - left_x < num_lines + 1:
-        print("Not enough space to draw the requested number of lines.")
+        logger.debug("範圍過小，無法繪製指定數量的線條。")
         return image, []
 
-    # 建立繪圖物件
+    # 為支援半透明效果，將圖片轉為 RGBA（僅轉換一次）
+    image = image.convert("RGBA")
     draw = ImageDraw.Draw(image)
-
-    # 載入字型
     try:
         font = ImageFont.truetype(font_path, font_size)
     except IOError:
         font = ImageFont.load_default()
 
-    # 計算線條的 x 位置（均勻分佈）
-    interval = (right_x - left_x) / (num_lines + 1)
-    line_x_positions = [int(round(left_x + (i + 1) * interval)) for i in range(num_lines)]
+    # 利用 np.linspace 產生線條的 x 座標（均勻分佈）
+    line_x_positions = np.linspace(left_x, right_x, num_lines + 2, dtype=int)[1:-1]
 
-    # 收集所有符合初始條件的線條資訊
-    potential_lines = []
+    potential_lines = []  # 儲存符合初始條件的線條資訊
 
+    # 逐個處理每一條線
     for line_x in line_x_positions:
-        top_y, bottom_y = find_mask_at_x(mask_np, line_x, search_range=search_range)
+        # 利用 find_mask_at_x 找到當前 x 座標的上、下 y 座標
+        top_y, bottom_y = find_mask_at_x(mask_np, int(line_x), search_range=search_range)
         if top_y is None or bottom_y is None:
-            # 無法找到適合的遮罩範圍，略過
             continue
 
-        # 計算線條長度（以 mm 為單位）
         pixel_length = bottom_y - top_y
         mm_length = pixel_length * px_to_mm_ratio * line_length_weight
 
-        # 若在指定範圍內，將線條資訊加入潛在列表
+        # 過濾僅保留長度在允許範圍內的線條
         if min_length_mm <= mm_length <= max_length_mm:
             potential_lines.append({
-                'x': line_x,
+                'x': int(line_x),
                 'top_y': top_y,
                 'bottom_y': bottom_y,
                 'mm_length': mm_length
             })
 
     if not potential_lines:
-        print("No lines found within the specified length range.")
-        return image, []
+        logger.debug("在指定長度範圍內未找到線條。")
+        return image.convert("RGB"), []
 
-    # 計算平均長度
-    lengths = [line['mm_length'] for line in potential_lines]
+    # 收集所有潛在線條的長度，利用 np.array 加速操作
+    lengths = np.array([line['mm_length'] for line in potential_lines])
     if deviation_threshold > 0:
-        # 將長度四捨五入到小數點後一位以便分組
-        rounded_lengths = [round(length, 1) for length in lengths]
-        # 找出出現最多次的長度
+        # 四捨五入到小數點後一位（使用 np.round）
+        rounded_lengths = np.round(lengths, 1)
         unique_lengths, counts = np.unique(rounded_lengths, return_counts=True)
         mean_length = unique_lengths[np.argmax(counts)]
     else:
         mean_length = np.mean(lengths)
 
-    # 定義允許的長度範圍(定義為 0 的自動變成 0.2)
-    lower_bound = mean_length * (1 - (0.2 if deviation_threshold == 0 else deviation_threshold))
-    upper_bound = mean_length * (1 + (0.2 if deviation_threshold == 0 else deviation_threshold))
+    # 定義允許的長度範圍
+    lower_bound = mean_length * (1 - (deviation_threshold if deviation_threshold != 0 else 0.2))
+    upper_bound = mean_length * (1 + (deviation_threshold if deviation_threshold != 0 else 0.2))
 
-    # 過濾掉與平均長度偏差過大的線條
+    # 過濾掉與平均長度差異過大的線條
     filtered_lines = [line for line in potential_lines if lower_bound <= line['mm_length'] <= upper_bound]
-
     if not filtered_lines:
-        print("No lines remain after filtering based on deviation from the mean length.")
-        return image, []
+        logger.debug("根據平均長度偏差過濾後沒有剩餘的線條。")
+        return image.convert("RGB"), []
 
-    # 收集過濾後的線條長度
+    # 收集過濾後線條的長度
     line_lengths: List[float] = [line['mm_length'] for line in filtered_lines]
 
-    # 繪製過濾後的線條
+    # 建立一個 overlay，用來一次性繪製所有文字背景
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    
+    # 記錄每條線的文字資訊，格式為 (text, (text_x, text_y), (text_width, text_height))
+    text_infos = []
     for line in filtered_lines:
         line_x = line['x']
         top_y = line['top_y']
@@ -552,18 +574,16 @@ def draw_vertical_lines_with_length_mm(
         mm_length = line['mm_length']
 
         # 繪製垂直線條
-        draw.line(
-            [(line_x, top_y), (line_x, bottom_y)],
-            fill=line_color,
-            width=line_width
-        )
+        draw.line([(line_x, top_y), (line_x, bottom_y)],
+                  fill=line_color, width=line_width)
 
+        # 文字標註內容
         length_text = f"{mm_length:.2f} mm"
         bbox = draw.textbbox((0, 0), length_text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
-        # 將文字顯示在線條上方 10 px
+        # 計算文字位置：使其置中於線條上方 10 像素處
         text_x = line_x - text_width / 2
         text_y = top_y - text_height - 10
 
@@ -571,10 +591,10 @@ def draw_vertical_lines_with_length_mm(
         text_x = max(0, min(image.width - text_width, text_x))
         text_y = max(0, text_y)
 
-        # 繪製半透明背景矩形
-        # 注意：PIL 不直接支持半透明矩形，需創建新圖層
-        overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
-        overlay_draw = ImageDraw.Draw(overlay)
+        text_infos.append((length_text, (text_x, text_y), (text_width, text_height)))
+
+    # 在 overlay 上集中繪製所有文字背景（半透明矩形）
+    for _, (text_x, text_y), (text_width, text_height) in text_infos:
         background_rect = [
             text_x - background_padding,
             text_y - background_padding,
@@ -582,10 +602,13 @@ def draw_vertical_lines_with_length_mm(
             text_y + text_height + background_padding
         ]
         overlay_draw.rectangle(background_rect, fill=(0, 0, 0, 128))
-        image = Image.alpha_composite(image.convert('RGBA'), overlay)
 
-        # 繪製文字標註
-        draw = ImageDraw.Draw(image)
+    # 合成 overlay 與原始圖片
+    image = Image.alpha_composite(image, overlay)
+
+    # 在合成後的圖片上繪製文字標註（確保文字在背景之上）
+    draw = ImageDraw.Draw(image)
+    for length_text, (text_x, text_y), _ in text_infos:
         draw.text((text_x, text_y), length_text, fill=(255, 255, 255), font=font)
 
-    return image.convert('RGB'), line_lengths
+    return image.convert("RGB"), line_lengths

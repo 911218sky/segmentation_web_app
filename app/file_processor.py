@@ -14,6 +14,7 @@ from PIL import Image
 import torch
 import torch.nn as nn
 import logging
+from i18n.language_manager import lang_manager
 from state_manager import ProcessingParams
 from utils import infer_batch, draw_average_length
 
@@ -25,7 +26,7 @@ def process_images(
     uploaded_files: List[UploadedFile],
     params: ProcessingParams,
     device: torch.device,
-    transform: Any
+    transform: Any,
 ) -> List[Tuple[Image.Image, Image.Image, List[float]]]:
     """
     處理上傳的圖片並返回結果。
@@ -42,6 +43,27 @@ def process_images(
     """
     results = []
     try:
+        # 建立進度條容器
+        progress_container = st.empty()
+        progress_text = st.empty()
+        progress_bar = st.progress(0)
+        
+        def update_progress(stage: str, current: int, total: int):
+            try:
+                # 更新進度條和文字
+                stages = {
+                    "loading": f"[1/3] {lang_manager.get_text('progress_loading')}",
+                    "inference": f"[2/3] {lang_manager.get_text('progress_inference')}",
+                    "drawing": f"[3/3] {lang_manager.get_text('progress_drawing')}"
+                }
+                # 確保進度值在0到1之間
+                progress = min(1.0, current / total)
+                with progress_text:
+                    st.text(f"{stages[stage]}: {int(progress * 100)}%")
+                progress_bar.progress(progress)
+            except Exception as e:
+                logger.error(f"更新進度時發生錯誤: {e}")
+        
         # 使用臨時目錄來存儲圖片數據
         with tempfile.TemporaryDirectory() as temp_dir:
             image_paths = []
@@ -67,7 +89,13 @@ def process_images(
                 line_length_weight=params.line_length_weight,
                 deviation_threshold=params.deviation_threshold,
                 transform=transform,
+                progress_callback=update_progress
             )
+            
+        # 清除進度顯示
+        progress_container.empty()
+        progress_text.empty()
+        progress_bar.empty()
 
     except Exception as e:
         logger.exception("處理圖片時發生錯誤")

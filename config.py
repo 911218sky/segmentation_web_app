@@ -10,7 +10,7 @@ class ThreadingConfig:
 @dataclass
 class ModelConfig:
     model_dir: str = 'models'
-    filename: str = 'model_traced_v3.pt'
+    filename: str = 'model_trt_fp16_v3.ts'
     fp_precision: str = 'fp16'  # 'fp16' or 'fp32' or 'bf16'
 
 @dataclass

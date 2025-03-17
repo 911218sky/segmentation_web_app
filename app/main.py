@@ -20,10 +20,7 @@ from file_processor import (
     collect_measurement_data
 )
 from state_manager import AppState
-from i18n.language_manager import LanguageManager
-
-# 初始化語言管理器
-lang_manager = LanguageManager()
+from i18n.language_manager import lang_manager
 
 # 設置日誌配置
 logging.basicConfig(level=logging.INFO)
@@ -46,7 +43,7 @@ def get_model_path() -> str:
     MODEL_DIR = CONFIG.model.model_dir
     MODEL_FILENAME = CONFIG.model.filename
     model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), MODEL_DIR, MODEL_FILENAME)
-    print(f"模型路徑: {model_path}")
+    logger.info(f"模型路徑: {model_path}")
     return model_path
 
 @st.cache_data
@@ -61,6 +58,10 @@ def get_infer_transform() -> T.Compose:
 def load_model(model_path: str) -> nn.Module:
     try:
         logger.info(f"正在從 {model_path} 加載模型")
+        if model_path.endswith(".ts"):
+            logger.info("TorchScript model detected use torch_tensorrt.")
+            import torch_tensorrt
+            assert device.type == "cuda", "TorchScript models require a CUDA device."
         model = torch.jit.load(model_path).to(device)
         model.eval()
         logger.info("模型加載成功")
@@ -152,7 +153,7 @@ def create_download_buttons(state: AppState) -> List[Tuple[str, Dict[str, Any]]]
     
     return buttons
 
-def display_results(state: AppState, lang_manager: LanguageManager) -> None:
+def display_results(state: AppState) -> None:
     """顯示處理後的圖片結果並提供下載功能"""
     st.markdown(lang_manager.get_text("results_title"))
 
@@ -242,22 +243,28 @@ def display_results(state: AppState, lang_manager: LanguageManager) -> None:
                             if state.params.deviation_percent > 0:
                                 mean_lengths = group_lengths(measurements, state.params.deviation_percent)
                             else:
-                                mean_lengths = [np.mean(measurements)]
+                                mean_lengths = [float(np.mean(measurements))]
+                            
+                            if not mean_lengths:  # 如果分組後沒有有效的長度
+                                mean_lengths = [0.0]
                             state.mean_lengths_cache[measurement_key] = mean_lengths
                         
-                        selected_index = st.radio(
-                            lang_manager.get_text("select_measurement"),
-                            options=range(len(mean_lengths)),
-                            format_func=lambda x: f"{mean_lengths[x]:.2f} mm",
-                            key=radio_key,
-                            horizontal=True,
-                            on_change=lambda: on_radio_change(state, radio_key),
-                            label_visibility="collapsed",
-                        )
-                        
-                        selected_measurement = mean_lengths[selected_index]
-                        state.selected_measurements[measurement_key] = selected_measurement
-                        st.write(lang_manager.get_text("selected_measurement").format(selected_measurement))
+                        if mean_lengths:  # 確保有有效的長度值
+                            selected_index = st.radio(
+                                lang_manager.get_text("select_measurement"),
+                                options=range(len(mean_lengths)),
+                                format_func=lambda x: f"{mean_lengths[x]:.2f} mm",
+                                key=radio_key,
+                                horizontal=True,
+                                on_change=lambda: on_radio_change(state, radio_key),
+                                label_visibility="collapsed",
+                            )
+                            
+                            selected_measurement = mean_lengths[selected_index]
+                            state.selected_measurements[measurement_key] = selected_measurement
+                            st.write(lang_manager.get_text("selected_measurement").format(selected_measurement))
+                        else:
+                            st.write(lang_manager.get_text("no_valid_measurements"))
                     else:
                         st.write(lang_manager.get_text("no_vessel_detected"))
             else:
@@ -490,14 +497,14 @@ def main():
                             uploaded_files=state.uploaded_files,
                             params=state.params,
                             device=device,
-                            transform=infer_transform
+                            transform=infer_transform,
                         )
                     finally:
                         state.processing = False
 
     # 顯示處理結果
     if state.results:
-        display_results(state, lang_manager)
+        display_results(state)
 
 if __name__ == '__main__':
     main()
