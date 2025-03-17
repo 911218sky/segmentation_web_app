@@ -97,9 +97,9 @@ TRANSLATIONS: Translations = {
         "step2_title": "## 步驟 2: 設定測量參數",
         
         # Progress stages
-        "progress_loading": "加载图片中",
+        "progress_loading": "載入圖片中",
         "progress_inference": "AI分析中",
-        "progress_drawing": "绘制测量线中",
+        "progress_drawing": "繪製測量線中",
         
         # File operations
         "clear_results": "🗑️ 清空結果",
