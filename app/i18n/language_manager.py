@@ -10,8 +10,15 @@ class LanguageManager:
     def __init__(self, default_language: LanguageCode = "zh_TW"):
         self.default_language = default_language
         self.languages: Dict[LanguageCode, str] = {
-            "zh_TW": "繁體中文",
-            "en": "English"
+            "en": "English",
+            "zh_TW": "繁體中文 (Traditional Chinese)",
+            "ja": "日本語 (Japanese)",
+            "ko": "한국어 (Korean)",
+            "ru": "Русский (Russian)",
+            "fr": "Français (French)",
+            "es": "Español (Spanish)",
+            "de": "Deutsch (German)",
+            "ar": "العربية (Arabic)",
         }
         st.session_state.language = self.default_language
 
@@ -36,7 +43,7 @@ class LanguageManager:
         """創建語言選擇器"""
         current_lang = self.get_current_language()
         selected_lang = st.selectbox(
-            "🌐 Language / 語言",
+            "🌐 Language",
             options=list(self.languages.keys()),
             format_func=lambda x: self.languages[x],
             index=list(self.languages.keys()).index(current_lang),

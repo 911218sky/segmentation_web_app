@@ -2,15 +2,13 @@
 
 A vessel measurement tool based on **UNet3Plus** and **Streamlit**, designed for medical image analysis to automatically identify and measure vessel lengths in ultrasound images.
 
-[中文](README_zh.md) | English
-
 ## ✨ Features
 
 - 🖼️ **Multi-image Processing**: Support simultaneous upload and processing of multiple images
 - 🔍 **Smart Measurement**: Automatic vessel identification and precise measurement
 - 🎨 **Visualization**: Clear marking of vessel locations and measurement results
 - 📊 **Data Analysis**: Generate detailed Excel measurement reports
-- 🌐 **Multi-language**: Support for English and Traditional Chinese interfaces
+- 🌐 **Multi-language**: Support for English, Traditional Chinese, Russian, French, Spanish, Japanese, Korean, German, and Arabic interfaces
 - 💾 **Parameter Management**: Save and load commonly used measurement settings
 
 ## 🛠️ System Requirements
@@ -140,7 +138,7 @@ This project is licensed under the [MIT License](LICENSE).
 ## 📝 Changelog
 
 ### v0.2 (2024-03)
-- ✨ Added multi-language support
+- ✨ Added multi-language support (English, Traditional Chinese, Russian, French, Spanish, Japanese, Korean, German, Arabic)
 - 🔧 Optimized measurement algorithm
 - 📊 Added Excel report feature
 

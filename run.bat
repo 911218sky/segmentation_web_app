@@ -1,6 +1,7 @@
 @echo off
 
 call conda activate tf
-streamlit run app/main.py --server.port 3012
+
+streamlit run app/main.py
 
 pause
