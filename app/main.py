@@ -107,7 +107,7 @@ def confirm_results(state: AppState) -> None:
     
     # 生成 ZIP 文件
     start_time = time.time()
-    state.zip_buffer = create_zip_archive(state.results, state.uploaded_files)
+    state.zip_buffer = create_zip_archive(state.results, state.uploaded_files, is_compress=False)
     end_time = time.time()
     logger.info(f"生成 ZIP 文件時間: {end_time - start_time:.2f} 秒")
 
@@ -172,7 +172,7 @@ def display_results(state: AppState) -> None:
                 key="confirm_button",
                 use_container_width=True,
             ):
-                with st.spinner(lang_manager.get_text("generating_report")):
+                with st.spinner(lang_manager.get_text("generating_report"), show_time=True):
                     confirm_results(state)
                     st.rerun()
         else:
@@ -412,7 +412,7 @@ def main():
         )[1]
 
         # 參數預設值管理
-        with st.expander("⚙️ 參數預設值管理", expanded=True):
+        with st.expander(lang_manager.get_text("preset_management"), expanded=True):
             preset_name = st.text_input(
                 lang_manager.get_text("preset_name"),
                 key="preset_name",
@@ -448,17 +448,17 @@ def main():
             # 顯示已保存的預設值
             saved_presets = state.get_saved_presets()
             if saved_presets:
-                st.markdown("### 已保存的預設值")
+                st.markdown(lang_manager.get_text("saved_presets"))
                 for name in saved_presets.keys():
                     col1, col2, col3 = st.columns([2, 1, 1])
                     with col1:
                         st.write(f"**{name}**")
                     with col2:
-                        if st.form_submit_button(f"📥 載入 {name}"):
+                        if st.form_submit_button(f"{lang_manager.get_text('load_preset')} {name}"):
                             state.load_params(name)
                             st.rerun()
                     with col3:
-                        if st.form_submit_button(f"🗑️ 刪除 {name}"):
+                        if st.form_submit_button(f"{lang_manager.get_text('delete_preset')} {name}"):
                             state.delete_preset(name)
 
         # 提交按鈕
@@ -490,7 +490,7 @@ def main():
                     'line_color': line_color
                 })
                 # 顯示進度條
-                with st.spinner(lang_manager.get_text("processing_spinner")):
+                with st.spinner(lang_manager.get_text("processing_spinner"), show_time=True):
                     try:
                         state.results = process_images(
                             model=model,
@@ -505,6 +505,10 @@ def main():
     # 顯示處理結果
     if state.results:
         display_results(state)
+        
+    # 添加開發者介紹
+    st.markdown("---")
+    st.caption("Developed by Sky and K")
 
 if __name__ == '__main__':
     main()

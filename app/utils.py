@@ -15,6 +15,8 @@ import torchvision.transforms as transforms
 import torchvision.transforms.functional as T
 from PIL import Image, ImageDraw, ImageFont
 from tqdm import tqdm
+import concurrent.futures
+import io
 
 current_file = os.path.abspath(__file__)
 file_name = os.path.basename(current_file)
@@ -155,31 +157,45 @@ def infer_batch(
     valid_paths = [[] for _ in range(num_batches)]
     masks = []
 
-    # 載入圖片階段
+    # 載入圖片階段 - 使用多執行緒加速載入
     loaded_images = 0
+    
+    def load_and_transform_image(args: Tuple[int, str], is_compress: bool = True) -> Tuple[int, str, Optional[torch.Tensor], Optional[Tuple[int, int]], Optional[Exception]]:
+        batch_idx, image_path = args
+        try:
+            original_image = Image.open(image_path).convert("RGB")
+            if is_compress:
+                img_buffer = io.BytesIO()
+                original_image.save(img_buffer, format="JPEG", quality=75, optimize=True)
+                img_buffer.seek(0)
+                original_image = Image.open(img_buffer).convert("RGB")
+            original_size = original_image.size
+            transformed_image = transform(original_image)
+            return (batch_idx, image_path, transformed_image, original_size, None)
+        except Exception as e:
+            logger.error(f"無法載入或轉換圖片 {image_path}: {e}")
+            return (batch_idx, image_path, None, None, e)
+    
+    # 準備批次處理參數
+    batch_tasks = []
     for batch_idx in range(num_batches):
         start_idx = batch_idx * batch_size
         end_idx = min(start_idx + batch_size, total_images)
         current_batch_paths = image_paths[start_idx:end_idx]
-
-        # 載入和預處理當前批次的圖片
         for image_path in current_batch_paths:
-            try:
-                # 讀取並轉換圖片
-                original_image = Image.open(image_path).convert("RGB")
-                original_size = original_image.size
-                transformed_image = transform(original_image)
-
-                # 儲存有效的圖片資訊
+            batch_tasks.append((batch_idx, image_path))
+    
+    # 使用多執行緒並行處理圖片載入
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for result in executor.map(load_and_transform_image, batch_tasks):
+            batch_idx, image_path, transformed_image, original_size, error = result
+            if transformed_image is not None and original_size is not None:
                 valid_images[batch_idx].append(transformed_image)
                 valid_sizes[batch_idx].append(original_size)
                 valid_paths[batch_idx].append(image_path)
-                
-                loaded_images += 1
-                if progress_callback:
-                    progress_callback("loading", loaded_images, total_images)
-            except Exception as e:
-                logger.error(f"無法載入或轉換圖片 {image_path}: {e}")
+            loaded_images += 1
+            if progress_callback:
+                progress_callback("loading", loaded_images, total_images)
 
     # 推理階段
     processed_images = 0
@@ -258,7 +274,6 @@ def infer_batch(
         return (image_with_lines, image_with_mask, line_lengths)
     
     results = []
-    import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_image, i) for i in range(len(valid_images))]
         for i, future in enumerate(concurrent.futures.as_completed(futures)):

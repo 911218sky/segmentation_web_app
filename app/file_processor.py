@@ -58,6 +58,11 @@ def process_images(
                 }
                 # 確保進度值在0到1之間
                 progress = min(1.0, current / total)
+                
+                if progress >= 1.0:
+                    progress_bar.empty()
+                    progress_text.empty()
+                    
                 with progress_text:
                     st.text(f"{stages[stage]}: {int(progress * 100)}%")
                 progress_bar.progress(progress)
@@ -98,7 +103,7 @@ def process_images(
         progress_bar.empty()
 
     except Exception as e:
-        logger.exception("處理圖片時發生錯誤")
+        logger.error(f"處理圖片時發生錯誤: {e}")
         st.error(f"處理圖片時發生錯誤: {e}")
         return []
 
@@ -118,7 +123,8 @@ def process_images(
 
 def create_zip_archive(
     results: List[Tuple[Image.Image, Image.Image, List[float]]],
-    uploaded_files: List
+    uploaded_files: List,
+    is_compress: bool = True
 ) -> io.BytesIO:
     """
     將處理後的圖片加入一個 ZIP 壓縮包，並返回包含該 ZIP 文件的 BytesIO 對象。
@@ -126,6 +132,7 @@ def create_zip_archive(
     參數:
         results: List of Tuple，其中每個元祖包含 (處理後圖片, 原圖, 其他資訊)
         uploaded_files: 源上傳文件列表，用來獲取原始檔名
+        is_compress: 是否壓縮圖片，默認為 True
 
     返回:
         BytesIO 對象，包含 ZIP 壓縮包的所有內容
@@ -145,7 +152,10 @@ def create_zip_archive(
                     filename = base_filename
 
                 img_byte_arr = io.BytesIO()
-                img.save(img_byte_arr, format="JPEG", quality=75, optimize=True)
+                if is_compress:
+                    img.save(img_byte_arr, format="JPEG", quality=75, optimize=True)
+                else:
+                    img.save(img_byte_arr, format="JPEG")
                 img_byte_arr.seek(0)
                 zip_file.writestr(f"processed_{filename}", img_byte_arr.read())
     zip_buffer.seek(0)
