@@ -14,7 +14,6 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as T
 from PIL import Image, ImageDraw, ImageFont
-from tqdm import tqdm
 import concurrent.futures
 import io
 
@@ -233,47 +232,57 @@ def infer_batch(
     
     def process_image(i: int) -> Tuple[Optional[Image.Image], Optional[Image.Image], List[float]]:
         mask = masks[i]
-        original_width, original_height = valid_sizes[i]
-        current_image_path = valid_paths[i]
+        orig_w, orig_h = valid_sizes[i]
+        path = valid_paths[i]
 
-        # 將遮罩轉回 PIL Image 並縮放回原始尺寸
-        mask_pil = Image.fromarray(mask.squeeze()).resize(
-            (original_width, original_height), Image.NEAREST)
-        mask_np_resized = np.array(mask_pil)
-
-        # 載入原始圖片
+        # 載入原圖與遮罩、並放大
         try:
-            original_image = Image.open(current_image_path).convert("RGB")
+            orig_img = Image.open(path).convert("RGB")
         except Exception as e:
-            logger.error(f"無法載入原始圖片 {current_image_path}: {e}")
-            return (None, None, [])
+            logger.error(f"無法載入原始圖片 {path}: {e}")
+            return None, None, []
 
-        # 繪製垂直線條並標註長度
-        image_with_lines, line_lengths = draw_vertical_lines_with_length_mm(
-            image=original_image.copy(),
-            mask_np=mask_np_resized,
+        # 把 mask 先轉為 PIL 再 resize
+        mask_pil = Image.fromarray(mask.squeeze())
+        # 放大圖片 (為了繪製細線)
+        scale = 6
+        big_img  = orig_img.resize((orig_w*scale, orig_h*scale), Image.LANCZOS)
+        big_mask = mask_pil.resize((orig_w*scale, orig_h*scale), Image.NEAREST)
+        big_mask_np = np.array(big_mask)
+        
+        # 繪製垂直線條
+        big_with_lines, line_lengths = draw_vertical_lines_with_length_mm(
+            image=big_img,
+            mask_np=big_mask_np,
             num_lines=num_lines,
             line_color=line_color,
             line_width=line_width,
             depth_cm=depth_cm,
-            image_height_px=original_height,
+            image_height_px=orig_h*scale,
             min_length_mm=min_length_mm,
             max_length_mm=max_length_mm,
             line_length_weight=line_length_weight,
+            font_size=16*scale,
+            background_padding=5*scale,
+            search_range=5*scale, 
             deviation_threshold=deviation_threshold
         )
 
-        # 繪製遮罩
-        image_with_mask = draw_mask(
-            image=original_image.copy(), 
-            mask_np=mask_np_resized,
+        # 將繪製完線的結果縮回原尺寸
+        final_with_lines = big_with_lines.resize((orig_w, orig_h), Image.LANCZOS)
+
+        # 畫上遮罩
+        img_with_mask = draw_mask(
+            image=orig_img.copy(),
+            mask_np=np.array(mask_pil.resize((orig_w, orig_h), Image.NEAREST)),
             color=(*line_color, 200),
             threshold=0.5
         )
 
-        return (image_with_lines, image_with_mask, line_lengths)
+        return final_with_lines, img_with_mask, line_lengths
     
     results = []
+    # 使用多執行緒並行處理圖片繪製
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_image, i) for i in range(len(valid_images))]
         for i, future in enumerate(concurrent.futures.as_completed(futures)):
