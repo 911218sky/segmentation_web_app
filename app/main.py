@@ -356,6 +356,15 @@ def main():
                 help=lang_manager.get_text("max_length_help"),
                 key="max_length_mm"
             )
+            scale = st.slider(
+                lang_manager.get_text("scale"),
+                min_value=1,
+                max_value=5,
+                value=int(state.params.scale),
+                step=1,
+                help=lang_manager.get_text("scale_help"),
+                key="scale"
+            )
         with col2:
             depth_cm = st.slider(
                 lang_manager.get_text("depth"),
@@ -393,7 +402,7 @@ def main():
                 help=lang_manager.get_text("deviation_percent_help"),
                 key="deviation_percent"
             )
-
+            
         st.markdown(lang_manager.get_text("display_settings"))
         line_color = st.radio(
             lang_manager.get_text("line_color"),
@@ -438,7 +447,8 @@ def main():
                     'line_length_weight': line_length_weight,
                     'deviation_threshold': deviation_threshold,
                     'deviation_percent': deviation_percent,
-                    'line_color': line_color
+                    'line_color': line_color,
+                    'scale': scale
                 })
                 if preset_name:
                     state.save_params(preset_name)
@@ -487,7 +497,8 @@ def main():
                     'line_length_weight': line_length_weight,
                     'deviation_threshold': deviation_threshold,
                     'deviation_percent': deviation_percent,
-                    'line_color': line_color
+                    'line_color': line_color,
+                    'scale': scale
                 })
                 # 顯示進度條
                 with st.spinner(lang_manager.get_text("processing_spinner"), show_time=True):

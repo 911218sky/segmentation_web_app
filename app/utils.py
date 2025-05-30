@@ -43,6 +43,7 @@ def infer_batch(
     image_paths: List[str],
     model: nn.Module,
     batch_size: int = 32,
+    scale: int = 1, 
     max_workers: int = CONFIG.threading.max_workers,
     fp_precision: str = "fp16",
     num_lines: int = 10,
@@ -69,6 +70,9 @@ def infer_batch(
 
         batch_size (int, optional):
             每次在 GPU 上推理的圖片數量。預設為 32。
+            
+        scale (int, optional):
+            圖片縮放比例，可以畫更細的線，預設為 1。
 
         max_workers (int, optional):
             最大工作執行緒數，預設為 CONFIG.threading.max_workers。
@@ -244,16 +248,21 @@ def infer_batch(
 
         # 把 mask 先轉為 PIL 再 resize
         mask_pil = Image.fromarray(mask.squeeze())
+        
         # 放大圖片 (為了繪製細線)
-        scale = 6
-        big_img  = orig_img.resize((orig_w*scale, orig_h*scale), Image.LANCZOS)
-        big_mask = mask_pil.resize((orig_w*scale, orig_h*scale), Image.NEAREST)
-        big_mask_np = np.array(big_mask)
+        if scale > 1:
+            scale_img  = orig_img.resize((orig_w*scale, orig_h*scale), Image.LANCZOS)
+        else:
+            scale_img = orig_img
+        
+        # 放大 mask (原本是 256x256 就算 scale=1 也要放大)
+        scale_mask = mask_pil.resize((orig_w*scale, orig_h*scale), Image.NEAREST)
+        scale_mask_np = np.array(scale_mask)
         
         # 繪製垂直線條
-        big_with_lines, line_lengths = draw_vertical_lines_with_length_mm(
-            image=big_img,
-            mask_np=big_mask_np,
+        scale_with_lines, line_lengths = draw_vertical_lines_with_length_mm(
+            image=scale_img,
+            mask_np=scale_mask_np,
             num_lines=num_lines,
             line_color=line_color,
             line_width=line_width,
@@ -269,7 +278,7 @@ def infer_batch(
         )
 
         # 將繪製完線的結果縮回原尺寸
-        final_with_lines = big_with_lines.resize((orig_w, orig_h), Image.LANCZOS)
+        final_with_lines = scale_with_lines.resize((orig_w, orig_h), Image.LANCZOS)
 
         # 畫上遮罩
         img_with_mask = draw_mask(

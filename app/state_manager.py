@@ -7,6 +7,7 @@ class ProcessingParams:
     """處理參數的數據類"""
     num_lines: int = 50
     line_width: int = 3
+    scale: int = 1
     min_length_mm: float = 1.0
     max_length_mm: float = 7.0
     depth_cm: float = 3.2
@@ -177,3 +178,11 @@ class AppState:
     @params.setter
     def params(self, value: ProcessingParams):
         self.st.session_state.params = value
+
+    @property
+    def scale(self):
+        return self.st.session_state.scale
+
+    @scale.setter
+    def scale(self, value):
+        self.st.session_state.scale = value

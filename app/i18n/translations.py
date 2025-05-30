@@ -40,6 +40,8 @@ class TranslationStrings(TypedDict):
     deviation_threshold_help: str
     deviation_percent: str
     deviation_percent_help: str
+    scale: str
+    scale_help: str
     
     # Colors
     line_color: str
@@ -126,6 +128,8 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "設定可接受的誤差範圍百分比，超出此範圍的測量值將被過濾。(0 代表關閉過濾)",
         "deviation_percent": "分組差距百分比 (%)",
         "deviation_percent_help": "設定分組差距百分比，用於將相似長度的線條分組。(0 代表關閉分組)",
+        "scale": "縮放比例",
+        "scale_help": "設定影像縮放倍數，以放大圖片並獲取更多細節。(線條會更細)",
         
         # Colors
         "line_color": "線條顏色",
@@ -208,6 +212,8 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "Set acceptable deviation range percentage. Measurements outside this range will be filtered. (0 to disable filtering)",
         "deviation_percent": "Grouping Deviation Percentage (%)",
         "deviation_percent_help": "Set the percentage for grouping similar measurements. (0 to disable grouping)",
+        "scale": "Scale",
+        "scale_help": "Set the image scaling factor to enlarge the image and capture more detail.",
         
         # Colors
         "line_color": "Line Color",
@@ -295,6 +301,8 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "Установите допустимый процент отклонения. Измерения вне этого диапазона будут отфильтрованы. (0 для отключения фильтрации)",
         "deviation_percent": "Процент группировки отклонений (%)",
         "deviation_percent_help": "Установите процент для группировки схожих измерений. (0 для отключения группировки)",
+        "scale": "Масштаб",
+        "scale_help": "Установите коэффициент масштабирования изображения, чтобы увеличить его и получить больше деталей.",
         
         # Colors
         "line_color": "Цвет линии",
@@ -382,7 +390,9 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "Définir le pourcentage de déviation acceptable. Les mesures hors de cette plage seront filtrées. (0 pour désactiver le filtrage)",
         "deviation_percent": "Pourcentage de regroupement des déviations (%)",
         "deviation_percent_help": "Définir le pourcentage pour grouper mesures similaires. (0 pour désactiver le regroupement)",
-        
+        "scale": "Échelle",
+        "scale_help": "Définissez le facteur de mise à l’échelle de l’image pour l’agrandir et capturer davantage de détails.",
+
         # Colors
         "line_color": "Couleur de ligne",
         "line_color_help": "Choisir la couleur pour marquer les vaisseaux.",
@@ -464,6 +474,8 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "Establecer el porcentaje de desviación aceptable. Las mediciones fuera de este rango serán filtradas. (0 para desactivar el filtrado)",
         "deviation_percent": "Porcentaje de agrupación de desviaciones (%)",
         "deviation_percent_help": "Establecer el porcentaje para agrupar mediciones similares. (0 para desactivar la agrupación)",
+        "scale": "Escala",
+        "scale_help": "Establezca el factor de escala de la imagen para ampliarla y capturar más detalles.",
         
         # Colors
         "line_color": "Color de línea",
@@ -546,6 +558,9 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "許容される偏差範囲の割合を設定します。この範囲外の測定値はフィルタリングされます。(0でフィルタリング無効)",
         "deviation_percent": "グループ化偏差割合 (%)",
         "deviation_percent_help": "類似の測定値をグループ化する割合を設定します。(0でグループ化無効)",
+        "scale": "拡大率",
+        "scale_help": "画像を拡大して詳細を取得するための倍率を設定します。",
+
         
         # Colors
         "line_color": "線の色",
@@ -628,6 +643,8 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "허용 가능한 편차 범위의 백분율을 설정합니다. 이 범위를 벗어난 측정값은 필터링됩니다. (0은 필터링 비활성화)",
         "deviation_percent": "그룹화 편차 백분율 (%)",
         "deviation_percent_help": "유사한 측정값을 그룹화하기 위한 백분율을 설정합니다. (0은 그룹화 비활성화)",
+        "scale": "배율",
+        "scale_help": "이미지를 확대하여 더 많은 세부 정보를 캡처하기 위한 배율을 설정합니다.",
         
         # Colors
         "line_color": "선 색상",
@@ -710,6 +727,8 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "Legen Sie den akzeptablen Abweichungsprozentsatz fest. Messungen außerhalb dieses Bereichs werden gefiltert. (0 zum Deaktivieren der Filterung)",
         "deviation_percent": "Gruppierungsabweichung (%)",
         "deviation_percent_help": "Legen Sie den Prozentsatz für die Gruppierung ähnlicher Messungen fest. (0 zum Deaktivieren der Gruppierung)",
+        "scale": "Skalierung",
+        "scale_help": "Legen Sie den Skalierungsfaktor fest, um das Bild zu vergrößern und mehr Details zu erfassen.",
         
         # Colors
         "line_color": "Linienfarbe",
@@ -792,6 +811,9 @@ TRANSLATIONS: Translations = {
         "deviation_threshold_help": "تعيين نسبة الانحراف المقبولة. سيتم تصفية القياسات خارج هذا النطاق. (0 لتعطيل التصفية)",
         "deviation_percent": "نسبة تجميع الانحرافات (%)",
         "deviation_percent_help": "تعيين النسبة المئوية لتجميع القياسات المتشابهة. (0 لتعطيل التجميع)",
+        "scale": "مقياس",
+        "scale_help": "قم بتعيين عامل مقياس الصورة لتكبيرها والحصول على مزيد من التفاصيل.",
+
         
         # Colors
         "line_color": "لون الخط",

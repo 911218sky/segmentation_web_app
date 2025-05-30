@@ -85,6 +85,7 @@ def process_images(
                 device=device,
                 fp_precision=CONFIG.model.fp_precision,
                 batch_size=CONFIG.threading.batch_size,
+                scale=params.scale,
                 num_lines=params.num_lines,
                 line_width=params.line_width,
                 min_length_mm=params.min_length_mm,
