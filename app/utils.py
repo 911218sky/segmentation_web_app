@@ -148,7 +148,7 @@ def infer_batch(
     # 定義預設轉換（保持寬高比）
     if transform is None:
         transform: T.Compose = T.Compose([
-            T.Resize((256, 256)),
+            T.Resize(CONFIG.image.size),
             T.Grayscale(num_output_channels=1), 
             T.ToTensor(),
         ])
