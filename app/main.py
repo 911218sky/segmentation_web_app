@@ -61,7 +61,6 @@ def main():
         st.subheader("模型狀態")
         if st.session_state.predictor is not None:
             st.success(f"✅ 模型已載入")
-            st.info(f"📁 模型路徑: {WEIGHTS_PATH}")
         else:
             st.error("❌ 模型載入失敗")
             st.info(f"請確認模型檔案存在於: {WEIGHTS_PATH}")
