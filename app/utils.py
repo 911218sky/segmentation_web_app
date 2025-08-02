@@ -96,6 +96,7 @@ def process_batch_images(
                                 line_color=vis_config['line_color'],
                                 line_thickness=vis_config['line_thickness'],
                                 line_alpha=vis_config['line_alpha'],
+                                display_labels=vis_config['display_labels'],
                             )
                             
                             # 計算統計數據

@@ -152,6 +152,12 @@ def main():
             help="線條的透明度，1為完全不透明"
         )
 
+        display_labels = st.checkbox(
+            "顯示長度標籤",
+            value=VISUALIZATION_CONFIG['display_labels'],
+            help="是否顯示長度標籤"
+        )
+
         # 線條顏色選擇
         line_color_option = st.selectbox(
             "線條顏色",
@@ -219,6 +225,7 @@ def main():
                 'line_color': line_color,
                 'line_thickness': line_thickness,
                 'line_alpha': line_alpha,
+                'display_labels': display_labels
             }
 
             # 準備圖片資料

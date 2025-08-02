@@ -37,7 +37,8 @@ VISUALIZATION_CONFIG = {
     "point_radius": 3,
     "min_point_color": (255, 0, 0),  # 藍色
     "max_point_color": (0, 0, 255),  # 紅色
-    "show_points": False
+    "show_points": False,
+    "display_labels": True
 }
 
 # 線條提取配置
