@@ -1,525 +1,450 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import CONFIG
-
-from typing import List, Tuple, Dict, Any
-import torch
 import streamlit as st
-import torchvision.transforms as T
-import logging
 import numpy as np
-import torch.nn as nn
-import time
+from pathlib import Path
+import zipfile
+from io import BytesIO
+from PIL import Image
+import sys
+import math
 
-from utils import group_lengths
-from file_processor import (
-    process_images,
-    create_zip_archive,
-    create_excel_report,
-    collect_measurement_data
-)
-from state_manager import AppState
-from i18n.language_manager import lang_manager
+# 添加模組路徑
+current_dir = Path(__file__).resolve().parent
+sys.path.append(str(current_dir))
 
-# 設置日誌配置
-logging.basicConfig(level=logging.INFO)
-current_file = os.path.abspath(__file__)
-file_name = os.path.basename(current_file)
-logger = logging.getLogger(file_name)
+# 導入自定義模組和配置
+from yolo_predictor import YOLOPredictor
+from config import *
+from utils import process_batch_images
+from excel_utils import generate_excel_from_results, generate_csv_from_results
 
-# 檢查是否有可用的 GPU
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# 設置 Streamlit 頁面配置 - 必須是第一個 Streamlit 命令
+# 頁面配置
 st.set_page_config(
-    page_title=lang_manager.get_text("page_title"),
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="血管分割與測量系統",
+    page_icon="🔬",
+    layout="wide"
 )
 
-@st.cache_data
-def get_model_path() -> str:
-    MODEL_DIR = CONFIG.model.model_dir
-    MODEL_FILENAME = CONFIG.model.filename
-    model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), MODEL_DIR, MODEL_FILENAME)
-    logger.info(f"模型路徑: {model_path}")
-    return model_path
+# 初始化 session state
+if 'predictor' not in st.session_state:
+    st.session_state.predictor = None
+if 'processed_results' not in st.session_state:
+    st.session_state.processed_results = []
 
-@st.cache_data
-def get_infer_transform() -> T.Compose:
-    return T.Compose([
-        T.Resize(CONFIG.image.size),
-        T.Grayscale(num_output_channels=CONFIG.image.channels), 
-        T.ToTensor(),
-    ])
-
-@st.cache_resource(show_spinner=False)
-def load_model(model_path: str) -> nn.Module:
+@st.cache_resource
+def load_model(weights_path):
+    """載入並快取 YOLO 模型"""
     try:
-        logger.info(f"正在從 {model_path} 加載模型")
-        if model_path.endswith(".ts"):
-            logger.info("TorchScript model detected use torch_tensorrt.")
-            import torch_tensorrt
-            assert device.type == "cuda", "TorchScript models require a CUDA device."
-        model = torch.jit.load(model_path).to(device)
-        model.eval()
-        logger.info("模型加載成功")
-        return model
-    except FileNotFoundError:
-        logger.error(f"模型文件未找到: {model_path}")
-        st.error("❌ 模型文件未找到，請確保模型文件放在 models/ 目錄下。")
-        st.stop()
+        if not Path(weights_path).exists():
+            st.error(f"模型檔案不存在: {weights_path}")
+            return None
+        
+        predictor = YOLOPredictor(Path(weights_path))
+        return predictor
     except Exception as e:
-        logger.exception("加載模型時發生錯誤")
-        st.error(f"加載模型時發生錯誤: {e}")
-        st.stop()
-
-def on_radio_change(state: AppState, key: str) -> None:
-    """當選擇改變時的回調函數"""
-    # 只更新改變的測量值，避免重置所有狀態
-    if key.startswith("radio_measurement_"):
-        measurement_key = key[6:]  # Remove "radio_" prefix
-        mean_lengths = state.mean_lengths_cache.get(measurement_key, [])
-        if key in st.session_state:
-            value = st.session_state[key]
-            if mean_lengths and 0 <= value < len(mean_lengths):
-                state.selected_measurements[measurement_key] = mean_lengths[value]
-            else:
-                logger.warning(f"Invalid index {value} for mean_lengths with key {measurement_key}")
-                st.warning("選擇的測量值無效，請重新選擇。")
-    
-    state.results_confirmed = False
-    state.excel_buffer = None
-    state.zip_buffer = None
-
-def confirm_results(state: AppState) -> None:
-    """確認結果並生成報告"""
-    state.results_confirmed = True
-    # 生成報告
-    state.measurement_data = collect_measurement_data(
-        state.results,
-        state.uploaded_files,
-        state.selected_measurements
-    )
-    if state.measurement_data:
-        state.excel_buffer = create_excel_report(state.measurement_data)
-    
-    # 生成 ZIP 文件
-    start_time = time.time()
-    state.zip_buffer = create_zip_archive(state.results, state.uploaded_files, is_compress=False)
-    end_time = time.time()
-    logger.info(f"生成 ZIP 文件時間: {end_time - start_time:.2f} 秒")
-
-def create_download_buttons(state: AppState) -> List[Tuple[str, Dict[str, Any]]]:
-    """創建下載按鈕"""
-    buttons = []
-    
-    # ZIP下載按鈕
-    if state.results_confirmed and state.zip_buffer:
-        buttons.append(("zip", {
-            "label": "📥 下載所有處理後的圖片",
-            "data": state.zip_buffer,
-            "file_name": "processed_images.zip",
-            "mime": "application/zip",
-            "help": "點擊此按鈕下載所有處理後的圖片壓縮包。",
-            "use_container_width": True
-        }))
-    else:
-        buttons.append(("disabled_zip", {
-            "label": "📥 下載所有處理後的圖片",
-            "disabled": True,
-            "help": "請先確認測量結果才能下載",
-            "use_container_width": True
-        }))
-    
-    # Excel下載按鈕
-    if state.excel_buffer and state.results_confirmed:
-        buttons.append(("excel", {
-            "label": lang_manager.get_text("download_excel"),
-            "data": state.excel_buffer,
-            "file_name": "measurement_results.xlsx",
-            "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "help": lang_manager.get_text("download_excel_help"),
-            "use_container_width": True
-        }))
-    else:
-        buttons.append(("disabled_excel", {
-            "label": lang_manager.get_text("download_excel"),
-            "disabled": True,
-            "help": lang_manager.get_text("download_disabled_help"),
-            "use_container_width": True
-        }))
-    
-    return buttons
-
-def display_results(state: AppState) -> None:
-    """顯示處理後的圖片結果並提供下載功能"""
-    st.markdown(lang_manager.get_text("results_title"))
-
-    if not state.results:
-        st.warning(lang_manager.get_text("no_results"))
-        return
-    
-    # 確認按鈕和下載區域
-    col1, col2, col3 = st.columns([1, 1, 1])
-    # 確認按鈕
-    with col1:
-        if not state.results_confirmed:
-            if st.button(
-                lang_manager.get_text("confirm_results"),
-                type="primary",
-                key="confirm_button",
-                use_container_width=True,
-            ):
-                with st.spinner(lang_manager.get_text("generating_report"), show_time=True):
-                    confirm_results(state)
-                    st.rerun()
-        else:
-            st.button(
-                lang_manager.get_text("results_confirmed"),
-                type="secondary",
-                disabled=True,
-                key="confirm_button",
-                use_container_width=True
-            )
-    
-    # 下載按鈕
-    with col2:
-        if state.results_confirmed and state.zip_buffer:
-            st.download_button(
-                label=lang_manager.get_text("download_images"),
-                data=state.zip_buffer,
-                file_name="processed_images.zip",
-                mime="application/zip",
-                help=lang_manager.get_text("download_images_help"),
-                use_container_width=True
-            )
-        else:
-            st.button(
-                label=lang_manager.get_text("download_images"),
-                disabled=True,
-                help=lang_manager.get_text("download_disabled_help"),
-                use_container_width=True
-            )
-    
-    with col3:
-        if state.excel_buffer and state.results_confirmed:
-            st.download_button(
-                label=lang_manager.get_text("download_excel"),
-                data=state.excel_buffer,
-                file_name="measurement_results.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                help=lang_manager.get_text("download_excel_help"),
-                use_container_width=True
-            )
-        else:
-            st.button(
-                label=lang_manager.get_text("download_excel"),
-                disabled=True,
-                help=lang_manager.get_text("download_disabled_help"),
-                use_container_width=True
-            )
-
-    st.markdown("---")
-
-    # 使用網格布局顯示結果
-    cols = st.columns(2)
-    for idx, (processed_img, _, measurements) in enumerate(state.results):
-        with cols[idx % 2]:
-            filename = os.path.basename(state.uploaded_files[idx].name)
-            st.markdown(f"### {filename}")
-            if processed_img:
-                with st.container():
-                    st.image(processed_img, caption=lang_manager.get_text("processed_image"),
-                            use_container_width=True)
-                    
-                    if len(measurements) > 0:
-                        measurement_key = f"measurement_{filename}_{idx}"
-                        radio_key = f"radio_{measurement_key}"
-                        
-                        mean_lengths = state.mean_lengths_cache.get(measurement_key)
-                        if mean_lengths is None:
-                            if state.params.deviation_percent > 0:
-                                mean_lengths = group_lengths(measurements, state.params.deviation_percent)
-                            else:
-                                mean_lengths = [float(np.mean(measurements))]
-                            
-                            if not mean_lengths:  # 如果分組後沒有有效的長度
-                                mean_lengths = [0.0]
-                            state.mean_lengths_cache[measurement_key] = mean_lengths
-                        
-                        if mean_lengths:  # 確保有有效的長度值
-                            selected_index = st.radio(
-                                lang_manager.get_text("select_measurement"),
-                                options=range(len(mean_lengths)),
-                                format_func=lambda x: f"{mean_lengths[x]:.2f} mm",
-                                key=radio_key,
-                                horizontal=True,
-                                on_change=lambda: on_radio_change(state, radio_key),
-                                label_visibility="collapsed",
-                            )
-                            
-                            selected_measurement = mean_lengths[selected_index]
-                            state.selected_measurements[measurement_key] = selected_measurement
-                            st.write(lang_manager.get_text("selected_measurement").format(selected_measurement))
-                        else:
-                            st.write(lang_manager.get_text("no_valid_measurements"))
-                    else:
-                        st.write(lang_manager.get_text("no_vessel_detected"))
-            else:
-                st.error(lang_manager.get_text("processing_failed").format(filename))
+        st.error(f"模型載入失敗: {str(e)}")
+        return None
 
 def main():
-    """主函數，負責設置頁面內容和用戶交互"""
-    state = AppState(st)
-
-    # 添加語言選擇器到側邊欄
-    with st.sidebar:
-        lang_manager.get_language_selector()
-
-    # 設置頁面的標題和描述
-    st.title(lang_manager.get_text("app_title"))
-    st.write(lang_manager.get_text("app_description"))
-
-    # 加載模型
-    model = load_model(get_model_path())
-    infer_transform = get_infer_transform()
-
-    # 步驟 1：上傳圖片
-    st.markdown(lang_manager.get_text("step1_title"))
-    st.session_state["file_uploader_key"] = 0 if "file_uploader_key" not in st.session_state else st.session_state["file_uploader_key"]
+    st.title("🔬 血管分割與測量系統")
+    st.markdown("---")
     
-    if st.button(
-        lang_manager.get_text("clear_results"), 
-        type="primary",
-        key="clear_button",
-        help=lang_manager.get_text("clear_results_help"),
-        use_container_width=True
-    ):
-        st.session_state["file_uploader_key"] += 1
-        state.reset_file_state()
+    # 自動載入本地模型
+    if st.session_state.predictor is None:
+        with st.spinner("正在載入本地模型..."):
+            st.session_state.predictor = load_model(WEIGHTS_PATH)
+    
+    # 側邊欄配置
+    with st.sidebar:
+        st.header("⚙️ 系統配置")
         
-    uploaded_files = st.file_uploader(
-        lang_manager.get_text("upload_images"),
-        accept_multiple_files=True,
-        type=["jpg", "jpeg", "png"],
-        key=f"file_uploader_{st.session_state['file_uploader_key']}",
-    )
-
-    # 如果有新的文件上傳，更新狀態
-    if uploaded_files and uploaded_files != state.uploaded_files:
-        state.uploaded_files = uploaded_files
-        state.reset_file_state()
-
-    # 步驟 2：調整參數
-    st.markdown(lang_manager.get_text("step2_title"))
-
-    # 參數設置表單
-    with st.form("params_form"):
-        st.markdown(lang_manager.get_text("basic_params"))
-        col1, col2 = st.columns(2)
-        with col1:
-            num_lines = st.slider(
-                lang_manager.get_text("num_lines"),
-                min_value=1,
-                max_value=250,
-                value=int(state.params.num_lines),
-                step=1,
-                help=lang_manager.get_text("num_lines_help"),
-                key="num_lines"
-            )
-            line_width = st.slider(
-                lang_manager.get_text("line_width"),
-                min_value=1,
-                max_value=10,
-                value=int(state.params.line_width),
-                step=1,
-                help=lang_manager.get_text("line_width_help"),
-                key="line_width"
-            )
-            min_length_mm = st.slider(
-                lang_manager.get_text("min_length"),
-                min_value=0.1,
-                max_value=10.0,
-                value=float(state.params.min_length_mm),
-                step=0.1,
-                help=lang_manager.get_text("min_length_help"),
-                key="min_length_mm"
-            )
-            max_length_mm = st.slider(
-                lang_manager.get_text("max_length"),
-                min_value=4.0,
-                max_value=20.0,
-                value=float(state.params.max_length_mm),
-                step=0.1,
-                help=lang_manager.get_text("max_length_help"),
-                key="max_length_mm"
-            )
-            scale = st.slider(
-                lang_manager.get_text("scale"),
-                min_value=1,
-                max_value=5,
-                value=int(state.params.scale),
-                step=1,
-                help=lang_manager.get_text("scale_help"),
-                key="scale"
-            )
-        with col2:
-            depth_cm = st.slider(
-                lang_manager.get_text("depth"),
-                min_value=1.0,
-                max_value=20.0,
-                value=float(state.params.depth_cm),
-                step=0.1,
-                help=lang_manager.get_text("depth_help"),
-                key="depth_cm"
-            )
-            line_length_weight = st.slider(
-                lang_manager.get_text("line_length_weight"),
-                min_value=0.1,
-                max_value=5.0,
-                value=float(state.params.line_length_weight),
-                step=0.05,
-                help=lang_manager.get_text("line_length_weight_help"),
-                key="line_length_weight"
-            )
-            deviation_threshold = st.slider(
-                lang_manager.get_text("deviation_threshold"),
-                min_value=0.0,
-                max_value=1.0,
-                value=float(state.params.deviation_threshold),
-                step=0.01,
-                help=lang_manager.get_text("deviation_threshold_help"),
-                key="deviation_threshold"
-            )
-            deviation_percent = st.slider(
-                lang_manager.get_text("deviation_percent"),
-                min_value=0.0,
-                max_value=1.0,
-                value=float(state.params.deviation_percent),
-                step=0.01,
-                help=lang_manager.get_text("deviation_percent_help"),
-                key="deviation_percent"
-            )
-            
-        st.markdown(lang_manager.get_text("display_settings"))
-        line_color = st.radio(
-            lang_manager.get_text("line_color"),
-            options=[
-                (lang_manager.get_text("color_green"), (0, 255, 0)),
-                (lang_manager.get_text("color_red"), (255, 0, 0)),
-                (lang_manager.get_text("color_blue"), (0, 0, 255)),
-                (lang_manager.get_text("color_yellow"), (255, 255, 0)),
-                (lang_manager.get_text("color_white"), (255, 255, 255)),
-            ],
-            index=0,
-            format_func=lambda x: x[0],
-            help=lang_manager.get_text("line_color_help"),
-            key="line_color",
-            horizontal=True
-        )[1]
-
-        # 參數預設值管理
-        with st.expander(lang_manager.get_text("preset_management"), expanded=True):
-            preset_name = st.text_input(
-                lang_manager.get_text("preset_name"),
-                key="preset_name",
-                placeholder=lang_manager.get_text("preset_name_placeholder"),
-                label_visibility="visible"
-            )
-            
-            # 保存參數按鈕
-            save_params = st.form_submit_button(
-                lang_manager.get_text("save_params"),
-                type="secondary",
-                use_container_width=True
-            )
-
-            if save_params:
-                # 更新參數
-                state.update_params({
-                    'num_lines': num_lines,
-                    'line_width': line_width,
-                    'min_length_mm': min_length_mm,
-                    'max_length_mm': max_length_mm,
-                    'depth_cm': depth_cm,
-                    'line_length_weight': line_length_weight,
-                    'deviation_threshold': deviation_threshold,
-                    'deviation_percent': deviation_percent,
-                    'line_color': line_color,
-                    'scale': scale
-                })
-                if preset_name:
-                    state.save_params(preset_name)
-                else:
-                    st.warning(lang_manager.get_text("preset_name_warning"))
-
-            # 顯示已保存的預設值
-            saved_presets = state.get_saved_presets()
-            if saved_presets:
-                st.markdown(lang_manager.get_text("saved_presets"))
-                for name in saved_presets.keys():
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    with col1:
-                        st.write(f"**{name}**")
-                    with col2:
-                        if st.form_submit_button(f"{lang_manager.get_text('load_preset')} {name}"):
-                            state.load_params(name)
-                            st.rerun()
-                    with col3:
-                        if st.form_submit_button(f"{lang_manager.get_text('delete_preset')} {name}"):
-                            state.delete_preset(name)
-
-        # 提交按鈕
-        st.markdown(lang_manager.get_text("start_processing"))
-        submitted = st.form_submit_button(
-            lang_manager.get_text("start_processing") if not state.processing else lang_manager.get_text("processing"),
-            disabled=state.processing,
-            type="primary",
-            use_container_width=True
+        # 模型狀態顯示
+        st.subheader("模型狀態")
+        if st.session_state.predictor is not None:
+            st.success(f"✅ 模型已載入")
+            st.info(f"📁 模型路徑: {WEIGHTS_PATH}")
+        else:
+            st.error("❌ 模型載入失敗")
+            st.info(f"請確認模型檔案存在於: {WEIGHTS_PATH}")
+        
+        # 基本處理參數
+        st.subheader("基本參數")
+        pixel_size_mm = st.number_input(
+            "像素大小 (mm/pixel)", 
+            min_value=0.01, 
+            max_value=1.0, 
+            value=PROCESSING_CONFIG['pixel_size_mm'], 
+            step=0.01,
+            help="一個像素對應的實際距離"
         )
         
-        if submitted:
-            state.form_submitted = True
-            if not state.uploaded_files:
-                st.warning(lang_manager.get_text("upload_warning"))
-            else:
-                # 設置處理狀態
-                state.processing = True
-                # 更新參數
-                state.update_params({
-                    'num_lines': num_lines,
-                    'line_width': line_width,
-                    'min_length_mm': min_length_mm,
-                    'max_length_mm': max_length_mm,
-                    'depth_cm': depth_cm,
-                    'line_length_weight': line_length_weight,
-                    'deviation_threshold': deviation_threshold,
-                    'deviation_percent': deviation_percent,
-                    'line_color': line_color,
-                    'scale': scale
-                })
-                # 顯示進度條
-                with st.spinner(lang_manager.get_text("processing_spinner"), show_time=True):
-                    try:
-                        state.results = process_images(
-                            model=model,
-                            uploaded_files=state.uploaded_files,
-                            params=state.params,
-                            device=device,
-                            transform=infer_transform,
-                        )
-                    finally:
-                        state.processing = False
-
-    # 顯示處理結果
-    if state.results:
-        display_results(state)
+        confidence_threshold = st.slider(
+            "信心度閾值", 
+            min_value=0.1, 
+            max_value=1.0, 
+            value=YOLO_CONFIG['conf'], 
+            step=0.05,
+            help="YOLO 檢測的信心度閾值"
+        )
         
-    # 添加開發者介紹
-    st.markdown("---")
-    st.caption("Developed by Sky and K")
+        # 線條提取參數
+        st.subheader("🔍 線條提取參數")
+        sample_interval = st.number_input(
+            "採樣間隔 (像素)",
+            min_value=1,
+            max_value=100,
+            value=LINE_EXTRACTION_CONFIG['sample_interval'],
+            step=1,
+            help="x軸採樣步距，數值越小線條越密集"
+        )
+        
+        gradient_search_top = st.number_input(
+            "往上搜尋距離 (像素)",
+            min_value=1,
+            max_value=50,
+            value=LINE_EXTRACTION_CONFIG['gradient_search_top'],
+            step=1,
+            help="向上搜尋血管邊界的最大像素距離"
+        )
+        
+        gradient_search_bottom = st.number_input(
+            "往下搜尋距離 (像素)",
+            min_value=1,
+            max_value=50,
+            value=LINE_EXTRACTION_CONFIG['gradient_search_bottom'],
+            step=1,
+            help="向下搜尋血管邊界的最大像素距離"
+        )
+        
+        keep_ratio = st.slider(
+            "保留寬度比例",
+            min_value=0.1,
+            max_value=1.0,
+            value=LINE_EXTRACTION_CONFIG['keep_ratio'],
+            step=0.1,
+            help="用於邊界調整的寬度保留比例"
+        )
+        
+        # 視覺化參數
+        st.subheader("🎨 視覺化參數")
+        line_thickness = st.number_input(
+            "線條粗細",
+            min_value=1,
+            max_value=10,
+            value=VISUALIZATION_CONFIG['line_thickness'],
+            step=1,
+            help="繪製線條的粗細程度"
+        )
+        
+        line_alpha = st.slider(
+            "線條透明度",
+            min_value=0.1,
+            max_value=1.0,
+            value=VISUALIZATION_CONFIG['line_alpha'],
+            step=0.1,
+            help="線條的透明度，1為完全不透明"
+        )
+        
+        # 線條顏色選擇
+        line_color_option = st.selectbox(
+            "線條顏色",
+            options=["綠色", "紅色", "藍色", "白色", "黃色"],
+            index=0,
+            help="選擇線條的顏色"
+        )
+        
+        color_map = {
+            "綠色": (0, 255, 0),
+            "紅色": (0, 0, 255),
+            "藍色": (255, 0, 0),
+            "白色": (255, 255, 255),
+            "黃色": (0, 255, 255)
+        }
+        line_color = color_map[line_color_option]
+        
+        st.subheader("批次處理")
+        st.info(f"📦 批次大小: {BATCH_SIZE} 張圖片")
+        st.info("🚀 系統會自動進行批次推理以提高效率")
+    
+    # 主要內容區域
+    if st.session_state.predictor is None:
+        st.error("⚠️ 模型未載入，無法進行分析")
+        st.info("📝 請檢查模型檔案路徑是否正確")
+        return
+    
+    # 圖片上傳區域
+    st.subheader("📤 圖片上傳")
+    uploaded_files = st.file_uploader(
+        "選擇血管圖片",
+        type=['png', 'jpg', 'jpeg', 'bmp', 'tiff'],
+        accept_multiple_files=True,
+        help=f"支援多張圖片同時上傳，系統會以 {BATCH_SIZE} 張為單位進行批次處理"
+    )
+    
+    if uploaded_files:
+        st.success(f"已上傳 {len(uploaded_files)} 張圖片")
+        
+        # 處理選項
+        col1, col2 = st.columns(2)
+        with col1:
+            process_all = st.button("🚀 批次處理全部圖片", type="primary")
+        with col2:
+            clear_results = st.button("🗑️ 清除結果")
+        
+        if clear_results:
+            st.session_state.processed_results = []
+            st.rerun()
+        
+        # 批次處理圖片
+        if process_all:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # 準備配置參數
+            line_config = {
+                'sample_interval': sample_interval,
+                'gradient_search_top': gradient_search_top,
+                'gradient_search_bottom': gradient_search_bottom,
+                'keep_ratio': keep_ratio
+            }
+            
+            vis_config = {
+                'line_color': line_color,
+                'line_thickness': line_thickness,
+                'line_alpha': line_alpha,
+            }
+            
+            # 準備圖片資料
+            images_data = [(f.name, Image.open(f)) for f in uploaded_files]
+            total_batches = math.ceil(len(images_data) / BATCH_SIZE)
+            
+            status_text.text(f"開始批次處理 {len(images_data)} 張圖片 ({total_batches} 個批次)")
+            
+            # 批次處理
+            st.session_state.processed_results = process_batch_images(
+                st.session_state.predictor,
+                images_data,
+                pixel_size_mm,
+                confidence_threshold,
+                line_config,
+                vis_config
+            )
+            
+            progress_bar.progress(1.0)
+            status_text.text("✅ 批次處理完成！")
+        
+        # 顯示結果
+        if st.session_state.processed_results:
+            st.subheader("📊 分析結果")
+            
+            # 統計摘要
+            successful_results = [r for r in st.session_state.processed_results if r['success']]
+            failed_results = [r for r in st.session_state.processed_results if not r['success']]
+            
+            if successful_results:
+                col1, col2, col3, col4 = st.columns(4)
+                
+                all_mean_lengths = [r['stats']['mean_length'] for r in successful_results]
+                
+                with col1:
+                    st.metric(
+                        "成功處理", 
+                        f"{len(successful_results)}/{len(st.session_state.processed_results)}"
+                    )
+                with col2:
+                    st.metric("平均長度 (mm)", f"{np.mean(all_mean_lengths):.2f}")
+                with col3:
+                    st.metric("最大平均長度", f"{np.max(all_mean_lengths):.2f}")
+                with col4:
+                    st.metric("最小平均長度", f"{np.min(all_mean_lengths):.2f}")
+            
+            if failed_results:
+                st.warning(f"⚠️ {len(failed_results)} 張圖片處理失敗")
+            
+            # 計算需要多少行
+            successful_with_images = [r for r in successful_results if r['result'] is not None]
+            
+            if successful_with_images:
+                # 每行顯示2張圖片
+                cols_per_row = 2
+                num_rows = math.ceil(len(successful_with_images) / cols_per_row)
+                
+                for row in range(num_rows):
+                    cols = st.columns(cols_per_row)
+                    
+                    for col_idx in range(cols_per_row):
+                        result_idx = row * cols_per_row + col_idx
+                        
+                        if result_idx < len(successful_with_images):
+                            result = successful_with_images[result_idx]
+                            
+                            with cols[col_idx]:
+                                st.subheader(f"📷 {result['filename']}")
+                                
+                                # 只顯示處理後的圖片
+                                st.image(result['result'], use_container_width=True)
+                                
+                                # 顯示統計資料
+                                stats = result['stats']
+                                
+                                # 使用更緊凑的佈局顯示統計數據
+                                st.markdown("**📈 測量數據**")
+                                
+                                metrics_col1, metrics_col2 = st.columns(2)
+                                with metrics_col1:
+                                    st.metric("信心度", f"{stats['confidence']:.3f}")
+                                    st.metric("測量線數量", stats['num_lines'])
+                                with metrics_col2:
+                                    st.metric("平均長度", f"{stats['mean_length']:.2f} mm")
+                                    st.metric("標準差", f"{stats['std_length']:.2f} mm")
+                                
+                                # 顯示範圍
+                                st.markdown(f"**範圍:** {stats['min_length']:.2f} - {stats['max_length']:.2f} mm")
+                                
+                                st.markdown("---")
+            
+            # 失敗結果單獨顯示
+            if failed_results:
+                st.subheader("❌ 處理失敗的圖片")
+                for result in failed_results:
+                    st.error(f"**{result['filename']}**: {result['stats'].get('error', '未知錯誤')}")
+            
+            # 下載結果
+            if successful_results:
+                st.subheader("💾 下載結果")
+                
+                # 準備配置參數用於 Excel 報告
+                config_params_for_excel = {
+                    'pixel_size_mm': pixel_size_mm,
+                    'confidence_threshold': confidence_threshold,
+                    'sample_interval': sample_interval,
+                    'gradient_search_top': gradient_search_top,
+                    'gradient_search_bottom': gradient_search_bottom,
+                    'keep_ratio': keep_ratio,
+                    'line_color_option': line_color_option,
+                    'line_thickness': line_thickness,
+                    'line_alpha': line_alpha
+                }
+                
+                # 生成 Excel 和 CSV 檔案
+                excel_buffer = None
+                csv_content = None
+                
+                try:                    
+                    excel_buffer = generate_excel_from_results(
+                        st.session_state.processed_results, 
+                        config_params_for_excel
+                    )
+                    
+                    csv_content = generate_csv_from_results(st.session_state.processed_results)
+                    
+                except ImportError:
+                    st.error("❌ 無法載入 Excel 工具，請確認 excel_utils.py 檔案存在")
+                except Exception as e:
+                    st.error(f"❌ Excel/CSV 生成失敗: {str(e)}")
+                
+                # 創建 ZIP 檔案
+                zip_buffer = BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                    # 儲存圖片結果
+                    for result in successful_results:
+                        if result['result']:
+                            img_buffer = BytesIO()
+                            result['result'].save(img_buffer, format='JPEG')
+                            zip_file.writestr(
+                                f"results/result_{result['filename']}", 
+                                img_buffer.getvalue()
+                            )
+                    
+                    # 創建詳細配置報告
+                    config_report = [
+                        "血管分割與測量系統 - 配置與分析報告",
+                        "=" * 60,
+                        "",
+                        "處理配置參數:",
+                        f"  - 像素大小: {pixel_size_mm} mm/pixel",
+                        f"  - 信心度閾值: {confidence_threshold}",
+                        f"  - 批次大小: {BATCH_SIZE}",
+                        "",
+                        "線條提取配置:",
+                        f"  - 採樣間隔: {sample_interval} 像素",
+                        f"  - 往上搜尋距離: {gradient_search_top} 像素",
+                        f"  - 往下搜尋距離: {gradient_search_bottom} 像素",
+                        f"  - 保留寬度比例: {keep_ratio}",
+                        "",
+                        "視覺化配置:",
+                        f"  - 線條顏色: {line_color_option}",
+                        f"  - 線條粗細: {line_thickness}",
+                        f"  - 線條透明度: {line_alpha}",
+                        "",
+                        "處理結果:",
+                        f"  - 總圖片數量: {len(st.session_state.processed_results)}",
+                        f"  - 成功處理: {len(successful_results)}",
+                        f"  - 失敗數量: {len(failed_results)}",
+                        "",
+                        "詳細結果:",
+                        "-" * 60,
+                    ]
+                    
+                    for result in successful_results:
+                        stats = result['stats']
+                        config_report.extend([
+                            f"檔案: {result['filename']}",
+                            f"  信心度: {stats['confidence']:.3f}",
+                            f"  測量線數量: {stats['num_lines']}",
+                            f"  平均長度: {stats['mean_length']:.2f} mm",
+                            f"  標準差: {stats['std_length']:.2f} mm",
+                            f"  範圍: {stats['min_length']:.2f} - {stats['max_length']:.2f} mm",
+                            ""
+                        ])
+                    
+                    zip_file.writestr("configuration_and_analysis_report.txt", "\n".join(config_report))
+                    
+                    # 將 Excel 檔案也加入 ZIP
+                    if excel_buffer:
+                        zip_file.writestr("measurement_results.xlsx", excel_buffer.getvalue())
+                    
+                    # 將 CSV 檔案也加入 ZIP
+                    if csv_content:
+                        zip_file.writestr("measurement_results.csv", csv_content.encode('utf-8-sig'))
+                
+                # 下載按鈕佈局
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.download_button(
+                        label="📥 下載完整結果包 (ZIP)",
+                        data=zip_buffer.getvalue(),
+                        file_name="vessel_complete_analysis_results.zip",
+                        mime="application/zip",
+                        help="包含圖片結果、Excel報表、CSV檔案和文字報告"
+                    )
+                
+                with col2:
+                    if excel_buffer:
+                        st.download_button(
+                            label="📊 下載 Excel 報表",
+                            data=excel_buffer.getvalue(),
+                            file_name="vessel_measurement_results.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            help="包含詳細測量數據、統計摘要和配置參數"
+                        )
+                    else:
+                        st.error("Excel 生成失敗")
+                
+                with col3:
+                    if csv_content:
+                        st.download_button(
+                            label="📋 下載 CSV 檔案",
+                            data=csv_content,
+                            file_name="vessel_measurement_results.csv",
+                            mime="text/csv",
+                            help="測量結果的 CSV 格式檔案"
+                        )
+                    else:
+                        st.error("CSV 生成失敗")
+                
+                # 處理效率顯示
+                st.metric("📊 處理效率", f"{len(successful_results)} 張成功")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
