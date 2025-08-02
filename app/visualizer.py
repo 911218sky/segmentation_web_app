@@ -101,7 +101,7 @@ class Visualizer:
         # 標出平均長度（字體加大且位置更高）
         if lengths_mm:
             avg = float(np.mean(lengths_mm))
-            bottom_text = f"Mean length: {avg:.1f} mm"
+            bottom_text = f"Mean length: {avg:.2f} mm"
             font_scale = 1.2  # 從 0.7 增加到 1.2，讓字體更大
             (tw, th), _ = cv2.getTextSize(bottom_text, font, font_scale, font_thickness)
 
