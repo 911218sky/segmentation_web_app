@@ -1,48 +1,44 @@
 # 🩺 Vessel Measurement Tool v0.2
 
-A vessel measurement tool based on **UNet3Plus** and **Streamlit**, designed for medical image analysis to automatically identify and measure vessel lengths in ultrasound images.
-
-## ✨ Features
-
-- 🖼️ **Multi-image Processing**: Support simultaneous upload and processing of multiple images
-- 🔍 **Smart Measurement**: Automatic vessel identification and precise measurement
-- 🎨 **Visualization**: Clear marking of vessel locations and measurement results
-- 📊 **Data Analysis**: Generate detailed Excel measurement reports
-- 🌐 **Multi-language**: Support for English, Traditional Chinese, Russian, French, Spanish, Japanese, Korean, German, and Arabic interfaces
-- 💾 **Parameter Management**: Save and load commonly used measurement settings
+A cutting-edge vessel measurement tool powered by YOLOv12 and Streamlit, designed for advanced medical image analysis to automatically detect and measure vessel dimensions in ultrasound images with superior accuracy and real-time performance.
 
 ## 🛠️ System Requirements
 
-- Python Version: `>=3.8`
+- Python Version: `>=3.11`
 - CUDA (Optional): Support for GPU acceleration
-- OS: Windows / Linux / macOS
 
 ## 📦 Installation
 
 ### 1. Clone the Project
 ```bash
-git clone https://github.com/yourusername/vessel-measurement-tool.git
-cd vessel-measurement-tool
+git clone --recursive https://github.com/911218sky/segmentation_web_app.git
+cd segmentation_web_app
 ```
 
 ### 2. Create Virtual Environment (Recommended)
 ```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Linux/macOS
-source venv/bin/activate
+conda create -p venv python=3.11
+conda activate ./venv
 ```
 
 ### 3. Install Dependencies
 ```bash
+# Install PyTorch with CUDA support (recommended)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# Install YOLOv12 requirements
+pip install -r requirements_yolo.txt
+
+# Install application dependencies
 pip install -r requirements.txt
+
+# Install YOLOv12 in development mode
+cd ./yolov12
+pip install -e .
 ```
 
 ### 4. Prepare Model File
-Place the pre-trained model `model_traced_v3.pt` in the `models/` directory.
+Place the pre-trained model `best.pt` in the `models/` directory.
 
 ## 🚀 Usage Guide
 
@@ -50,99 +46,3 @@ Place the pre-trained model `model_traced_v3.pt` in the `models/` directory.
 ```bash
 streamlit run app/main.py
 ```
-
-### Operation Flow
-
-1. **Upload Images**
-   - Supports JPG, PNG formats
-   - Multiple image upload
-   - Drag and drop support
-
-2. **Adjust Parameters**
-   - Number of vertical lines: Control measurement precision
-   - Line width: Adjust marker visibility
-   - Min/Max line length: Filter outliers
-   - Vessel depth: Calibrate measurements
-   - Deviation threshold: Control measurement accuracy
-   - Grouping deviation: Auto-group similar measurements
-   - Line color: Customize marker color
-
-3. **Review Results**
-   - Real-time preview of processed images
-   - Select best measurements
-   - Confirm measurement results
-
-4. **Download Results**
-   - Download processed images (ZIP format)
-   - Export measurement report (Excel format)
-
-## ⚙️ Configuration
-
-Adjust the following settings in `config.py`:
-
-```python
-model:
-    model_dir: str    # Model directory path
-    filename: str     # Model filename
-
-image:
-    size: tuple      # Input image size
-    channels: int    # Image channels
-```
-
-## 📁 Project Structure
-
-```
-vessel-measurement-tool/
-├── app/
-│   ├── i18n/               # Internationalization
-│   │   ├── translations.py # Translation files
-│   │   └── language_manager.py
-│   ├── main.py            # Main program
-│   ├── utils.py           # Utility functions
-│   ├── file_processor.py  # File processing
-│   └── state_manager.py   # State management
-├── models/                # Model files
-├── config.py             # Configuration
-└── requirements.txt      # Dependencies
-```
-
-## ❓ Troubleshooting
-
-1. **Model File Not Found**
-   - Verify correct model filename
-   - Check if model is in correct directory
-
-2. **Memory Issues**
-   - Reduce number of concurrent images
-   - Close memory-intensive applications
-
-3. **Slow Processing**
-   - Check GPU acceleration status
-   - Adjust image size or batch size
-
-## 🤝 Contributing
-
-Issues and Pull Requests are welcome to improve the project.
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
-
-## 📮 Contact
-
-- Author: [Your Name]
-- Email: [your.email@example.com]
-- GitHub: [Your GitHub Profile]
-
-## 📝 Changelog
-
-### v0.2 (2024-03)
-- ✨ Added multi-language support (English, Traditional Chinese, Russian, French, Spanish, Japanese, Korean, German, Arabic)
-- 🔧 Optimized measurement algorithm
-- 📊 Added Excel report feature
-
-### v0.1 (2024-02)
-- 🎉 Initial release
-- 🔍 Basic measurement functionality
-- 📦 Batch processing support
