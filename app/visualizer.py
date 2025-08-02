@@ -1,6 +1,3 @@
-"""
-視覺化相關功能
-"""
 from typing import List, Tuple
 import numpy as np
 import cv2
@@ -60,6 +57,7 @@ class Visualizer:
         pixel_size_mm: float,
         font=cv2.FONT_HERSHEY_SIMPLEX,
         font_thickness: int = 1,
+        display_labels: bool = True,
         **line_kwargs
     ) -> np.ndarray:
         """
@@ -82,38 +80,38 @@ class Visualizer:
             mm = pixel_len * pixel_size_mm
             lengths_mm.append(mm)
 
-            # 標出長度
-            text = f"{mm:.1f} mm"
-            (tw, th), _ = cv2.getTextSize(text, font, 0.2, font_thickness)
+            if display_labels:
+                # 標出長度
+                text = f"{mm:.1f} mm"
+                (tw, th), _ = cv2.getTextSize(text, font, 0.2, font_thickness)
 
-            # center label horizontally on the line, place above y1
-            text_x = x - tw // 2
-            text_y = max(y1 - 4, th + box_pad)          # avoid going above image
+                # center label horizontally on the line, place above y1
+                text_x = x - tw // 2
+                text_y = max(y1 - 4, th + box_pad)          # avoid going above image
 
-            # background rectangle coords
-            top_left  = (text_x - box_pad, text_y - th - box_pad)
-            bot_right = (text_x + tw + box_pad, text_y + box_pad)
+                # background rectangle coords
+                top_left  = (text_x - box_pad, text_y - th - box_pad)
+                bot_right = (text_x + tw + box_pad, text_y + box_pad)
 
-            cv2.rectangle(vis, top_left, bot_right, (0, 0, 0), -1) 
-            cv2.putText(vis, text, (text_x, text_y), font, 0.2,
-                        (255, 255, 255), font_thickness, cv2.LINE_AA)
+                cv2.rectangle(vis, top_left, bot_right, (0, 0, 0), -1) 
+                cv2.putText(vis, text, (text_x, text_y), font, 0.2,
+                            (255, 255, 255), font_thickness, cv2.LINE_AA)
 
-        # 標出平均長度（字體加大且位置更高）
+        # 標出平均長度
         if lengths_mm:
             avg = float(np.mean(lengths_mm))
-            bottom_text = f"Mean length: {avg:.2f} mm"
-            font_scale = 1.2  # 從 0.7 增加到 1.2，讓字體更大
-            (tw, th), _ = cv2.getTextSize(bottom_text, font, font_scale, font_thickness)
+            bottom_text = f"Mean length: {avg:.1f} mm"
+            (tw, th), _ = cv2.getTextSize(bottom_text, font, 0.2, font_thickness)
 
-            # 水平置中，並將文字往上移（例如離底部 30 像素）
+            # 水平置中
             text_x = (w - tw) // 2
-            text_y = h - 30
+            text_y = h - 6 
 
             top_left  = (text_x - box_pad, text_y - th - box_pad)
             bot_right = (text_x + tw + box_pad, text_y + box_pad)
 
             cv2.rectangle(vis, top_left, bot_right, (0, 0, 0), -1)
-            cv2.putText(vis, bottom_text, (text_x, text_y), font, font_scale,
+            cv2.putText(vis, bottom_text, (text_x, text_y), font, 1,
                         (255, 255, 255), font_thickness, cv2.LINE_AA)
 
         return vis
