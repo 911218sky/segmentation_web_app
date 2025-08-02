@@ -39,7 +39,9 @@ pip install -e .
 ```
 
 ### 4. Prepare Model File
-Place the pre-trained model `best.pt` in the `models/` directory.
+```bash
+tar -xzf models.tar.gz
+```
 
 ## 🚀 Usage Guide
 
