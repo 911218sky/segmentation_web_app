@@ -5,7 +5,7 @@ import numpy as np
 
 # 添加父目錄到路徑
 current_dir = Path(__file__).resolve().parent
-parent_dir = current_dir.parent.parent
+parent_dir = current_dir.parent
 sys.path.insert(0, str(parent_dir))
 
 from yolov12.ultralytics import YOLO
