@@ -13,8 +13,8 @@ class LineExtractor:
         img: np.ndarray,
         mask: np.ndarray,
         sample_interval: int = 10,
-        gradient_search_top: int = 10,
-        gradient_search_bottom: int = 10,
+        gradient_search_top: int = 20,
+        gradient_search_bottom: int = 20,
         keep_ratio: float = 0.5,
     ) -> List[Tuple[int, int, int]]:
         if img is None or mask is None:
@@ -24,7 +24,7 @@ class LineExtractor:
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img.copy()
 
         # 對比度增強 (CLAHE)
-        clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8,8))
+        clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(16,16))
         enhanced_gray = clahe.apply(gray)
 
         # 遮罩二值化
@@ -37,6 +37,7 @@ class LineExtractor:
         x_start, x_end = border, w - border
 
         for x in range(x_start, x_end, sample_interval):
+            # 獲取二值化圖片中 x 軸的 y 座標
             ys = np.where(binary[:, x])[0]
             if ys.size == 0:
                 continue
@@ -61,8 +62,8 @@ class LineExtractor:
 
         # 平滑過濾
         lines = LineExtractor._filter_with_smoothing(lines,
-                                                    window_size=5, 
-                                                    threshold=0.2)
+                                                    window_size=10, 
+                                                    threshold=0.1)
         return lines
 
     @staticmethod
