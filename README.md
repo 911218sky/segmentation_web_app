@@ -27,6 +27,7 @@ conda activate ./venv
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 # Install YOLOv12 requirements
+pip install flash_attn-2.8.2+cu12torch2.7cxx11abiFALSE-cp311-cp311-linux_x86_64.whl
 pip install -r requirements_yolo.txt
 
 # Install application dependencies
