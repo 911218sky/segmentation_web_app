@@ -1,18 +1,19 @@
 import cv2
 import numpy as np
-import tempfile
-from pathlib import Path
-from typing import Union
+import shutil
+from typing import List, Tuple, Union
 from PIL import Image
 
+from utils.image_utils import batch_resize_with_cleanup, convert_pil_to_temp_files
 from config import *
 from line_extractor import LineExtractor
 from visualizer import Visualizer
 from yolo_predictor import YOLOPredictor
 
+
 def process_batch_images(
     predictor: YOLOPredictor,
-    images,
+    images: List[Tuple[str, Image.Image]],
     pixel_size_mm: float = 0.30,
     conf_threshold: float = 0.25, 
     line_config: Union[dict, None] = None,
@@ -33,53 +34,45 @@ def process_batch_images(
     # 將圖片分批處理
     for i in range(0, len(images), batch_size):
         batch = images[i:i+batch_size]
-        batch_temp_paths = []
+        image_files = []
+        cleanup_temp_files = None
+        cleanup_resize = None
         
         try:
-            # 準備批次圖片的臨時檔案
-            for j, (filename, image) in enumerate(batch):
-                # 將 PIL 圖片轉換為 OpenCV 格式
-                if isinstance(image, Image.Image):
-                    image_array = np.array(image)
-                    if len(image_array.shape) == 3 and image_array.shape[2] == 3:
-                        image_cv = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-                    else:
-                        image_cv = image_array
-                
-                # 創建臨時檔案
-                tmp_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-                cv2.imwrite(tmp_file.name, image_cv)
-                batch_temp_paths.append((tmp_file.name, filename, image, image_cv))
+            image_files_temp, cleanup_temp_files = convert_pil_to_temp_files(batch)
+            
+            # 統一大小
+            image_files, info_list, cleanup_resize = batch_resize_with_cleanup(
+                image_files_temp, 
+                target_size=TARGET_SIZE
+            )
+            
+            # 獲取資料夾路徑
+            temp_dir = image_files[0].parent
             
             # 批次預測
-            temp_paths = [path for path, _, _, _ in batch_temp_paths]
-            if len(temp_paths) == 1:
-                yolo_results = predictor.predict(
-                    temp_paths[0],
-                    **yolo_config,
-                )
-            else:
-                # 處理多個檔案
-                yolo_results = []
-                for temp_path in temp_paths:
-                    result = predictor.predict(
-                        temp_path,
-                        **yolo_config,
-                    )
-                    yolo_results.extend(result if isinstance(result, list) else [result])
+            yolo_results = predictor.predict(
+                temp_dir,
+                **yolo_config,
+            )
+            yolo_results = [result for result in yolo_results if result is not None]
             
             # 處理批次結果
-            for idx, (temp_path, filename, original_image, image_cv) in enumerate(batch_temp_paths):
+            for idx, image_file in enumerate(image_files):
                 try:
                     if idx < len(yolo_results):
                         result = yolo_results[idx]
+                        # 原始圖片檔名
+                        filename = images[idx][0]
                         bbox, confidence, mask = predictor.extract_max_confidence_segment(result)
                         
                         if mask is not None:
+                            img = cv2.imread(image_file)
+                            
                             # 提取垂直線 - 使用配置參數
                             line_extractor = LineExtractor()
                             vertical_lines = line_extractor.extract_vertical_lines_from_mask(
-                                img=image_cv,
+                                img=img,
                                 mask=mask,
                                 sample_interval=line_config['sample_interval'],
                                 gradient_search_top=line_config['gradient_search_top'],
@@ -90,7 +83,7 @@ def process_batch_images(
                             # 視覺化 - 使用配置參數
                             visualizer = Visualizer()
                             final_image = visualizer.visualize_vertical_lines_with_mm(
-                                image_cv,
+                                img,
                                 vertical_lines,
                                 pixel_size_mm=pixel_size_mm,
                                 line_color=vis_config['line_color'],
@@ -143,12 +136,25 @@ def process_batch_images(
                         'success': False
                     })
                 
+        except Exception as e:
+            # 如果整個批次失敗，為該批次的所有圖片添加錯誤結果
+            for image_path in image_files_temp:
+                results.append({
+                    'filename': image_path.name,
+                    'result': None,
+                    'stats': {'error': f'批次處理錯誤: {str(e)}'},
+                    'success': False
+                })
         finally:
-            # 清理臨時檔案
-            for temp_path, _, _, _ in batch_temp_paths:
+            if cleanup_temp_files is not None:
                 try:
-                    Path(temp_path).unlink()
-                except:
-                    pass
+                    cleanup_temp_files()
+                except Exception as e:
+                    print(f"清理臨時檔案時發生錯誤: {e}")
+            if cleanup_resize is not None:
+                try:
+                    cleanup_resize()
+                except Exception as e:
+                    print(f"清理臨時目錄時發生錯誤: {e}")
     
     return results

@@ -20,8 +20,8 @@ from config import (
     WEIGHTS_PATH,
     YOLO_CONFIG,
 )
-from excel_utils import generate_csv_from_results, generate_excel_from_results
-from utils import process_batch_images
+from utils.excel import generate_csv_from_results, generate_excel_from_results
+from utils.process import process_batch_images
 from yolo_predictor import YOLOPredictor
 
 # 頁面配置
