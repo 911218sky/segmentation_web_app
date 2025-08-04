@@ -6,6 +6,7 @@ class LineExtractor:
     """
     從血管分割遮罩產生垂直線，
     並利用原始影像的灰階梯度，讓線貼齊血管壁。
+    支援區域限制功能。
     """
 
     @staticmethod
@@ -16,9 +17,16 @@ class LineExtractor:
         gradient_search_top: int = 20,
         gradient_search_bottom: int = 20,
         keep_ratio: float = 0.5,
+        region: Tuple[int, int, int, int] = None  # (left, top, right, bottom)
     ) -> List[Tuple[int, int, int]]:
         if img is None or mask is None:
             return []
+
+        # 如果指定了區域，先裁切圖片和遮罩
+        if region is not None:
+            left, top, right, bottom = region
+            img = img[top:bottom, left:right]
+            mask = mask[top:bottom, left:right]
 
         # 轉灰階
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img.copy()
@@ -58,7 +66,12 @@ class LineExtractor:
             if bottom_y is None:
                 bottom_y = rough_max
 
-            lines.append((x, int(top_y), int(bottom_y)))
+            # 如果指定了區域，需要調整座標回原始圖片座標系
+            if region is not None:
+                left, top, _, _ = region
+                lines.append((x + left, int(top_y) + top, int(bottom_y) + top))
+            else:
+                lines.append((x, int(top_y), int(bottom_y)))
 
         # 平滑過濾
         lines = LineExtractor._filter_with_smoothing(lines,
@@ -89,7 +102,6 @@ class LineExtractor:
             prev_val = gray[y, x]
 
         return best_y if best_y is not None else start_y
-  
   
     @staticmethod
     def _filter_with_smoothing(

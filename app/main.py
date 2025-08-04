@@ -4,7 +4,8 @@ import sys
 import zipfile
 from io import BytesIO
 from pathlib import Path
-
+import time
+from config.config_manager import *
 import numpy as np
 from PIL import Image
 
@@ -14,11 +15,16 @@ sys.path.append(str(current_dir))
 
 from config import (
     BATCH_SIZE,
-    LINE_EXTRACTION_CONFIG,
-    PROCESSING_CONFIG,
-    VISUALIZATION_CONFIG,
     WEIGHTS_PATH,
-    YOLO_CONFIG,
+    DEFAULT_CONFIGS,
+)
+from config.config_manager import ( 
+    load_saved_configs,
+    save_config_to_browser,
+    delete_config_from_browser,
+    apply_config,
+    initialize_session_state,
+    get_current_config
 )
 from utils.excel import generate_csv_from_results, generate_excel_from_results
 from utils.process import process_batch_images
@@ -37,7 +43,6 @@ if 'predictor' not in st.session_state:
 if 'processed_results' not in st.session_state:
     st.session_state.processed_results = []
 
-
 @st.cache_resource
 def load_model(weights_path):
     """載入並快取 YOLO 模型"""
@@ -52,10 +57,12 @@ def load_model(weights_path):
         st.error(f"模型載入失敗: {str(e)}")
         return None
 
-
 def main():
     st.title("🔬 血管分割與測量系統")
     st.markdown("---")
+
+    # 初始化配置
+    initialize_session_state()
 
     # 自動載入本地模型
     if st.session_state.predictor is None:
@@ -74,14 +81,71 @@ def main():
             st.error("❌ 模型載入失敗")
             st.info(f"請確認模型檔案存在於: {WEIGHTS_PATH}")
 
+        # 設定管理區域
+        st.subheader("💾 設定管理")
+        
+        # 載入所有可用設定
+        available_configs = load_saved_configs()
+        config_names = list(available_configs.keys())
+        
+        selected_config = st.selectbox(
+            "選擇設定組合",
+            options=config_names,
+            help="選擇要套用的設定組合"
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 套用設定", type="primary"):
+                if selected_config in available_configs:
+                    apply_config(available_configs[selected_config])
+                    st.success(f"✅ 已套用「{selected_config}」設定")
+                    time.sleep(0.5)
+                    st.rerun()
+        
+        with col2:
+            can_delete = selected_config not in DEFAULT_CONFIGS
+            if st.button("🗑️ 刪除設定", disabled=not can_delete):
+                if can_delete:
+                    if delete_config_from_browser(selected_config):
+                        st.success(f"✅ 已刪除「{selected_config}」設定")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error("刪除設定失敗")
+                else:
+                    st.warning("無法刪除預設設定")
+
+        # 儲存當前設定
+        st.markdown("---")
+        st.markdown("**儲存當前設定**")
+        
+        new_config_name = st.text_input(
+            "設定名稱",
+            placeholder="輸入新設定的名稱...",
+            help="為當前的參數配置命名"
+        )
+        
+        if st.button("💾 儲存當前設定"):
+            if new_config_name:
+                current_config = get_current_config()
+                if save_config_to_browser(new_config_name, current_config):
+                    st.success(f"✅ 設定「{new_config_name}」已儲存")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.error("儲存設定失敗")
+            else:
+                st.error("請輸入設定名稱")
+
         # 基本處理參數
         st.subheader("基本參數")
         pixel_size_mm = st.number_input(
             "像素大小 (mm/pixel)",
             min_value=0.01,
             max_value=1.0,
-            value=PROCESSING_CONFIG['pixel_size_mm'],
             step=0.01,
+            key='pixel_size_mm',
             help="一個像素對應的實際距離"
         )
 
@@ -89,8 +153,8 @@ def main():
             "信心度閾值",
             min_value=0.1,
             max_value=1.0,
-            value=YOLO_CONFIG['conf'],
             step=0.05,
+            key='confidence_threshold',
             help="YOLO 檢測的信心度閾值"
         )
 
@@ -100,8 +164,8 @@ def main():
             "採樣間隔 (像素)",
             min_value=1,
             max_value=100,
-            value=LINE_EXTRACTION_CONFIG['sample_interval'],
             step=1,
+            key='sample_interval',
             help="x軸採樣步距，數值越小線條越密集"
         )
 
@@ -109,8 +173,8 @@ def main():
             "往上搜尋距離 (像素)",
             min_value=1,
             max_value=50,
-            value=LINE_EXTRACTION_CONFIG['gradient_search_top'],
             step=1,
+            key='gradient_search_top',
             help="向上搜尋血管邊界的最大像素距離"
         )
 
@@ -118,8 +182,8 @@ def main():
             "往下搜尋距離 (像素)",
             min_value=1,
             max_value=50,
-            value=LINE_EXTRACTION_CONFIG['gradient_search_bottom'],
             step=1,
+            key='gradient_search_bottom',
             help="向下搜尋血管邊界的最大像素距離"
         )
 
@@ -127,8 +191,8 @@ def main():
             "保留寬度比例",
             min_value=0.1,
             max_value=1.0,
-            value=LINE_EXTRACTION_CONFIG['keep_ratio'],
             step=0.1,
+            key='keep_ratio',
             help="用於邊界調整的寬度保留比例"
         )
 
@@ -138,8 +202,8 @@ def main():
             "線條粗細",
             min_value=1,
             max_value=10,
-            value=VISUALIZATION_CONFIG['line_thickness'],
             step=1,
+            key='line_thickness',
             help="繪製線條的粗細程度"
         )
 
@@ -147,14 +211,14 @@ def main():
             "線條透明度",
             min_value=0.1,
             max_value=1.0,
-            value=VISUALIZATION_CONFIG['line_alpha'],
             step=0.1,
+            key='line_alpha',
             help="線條的透明度，1為完全不透明"
         )
 
         display_labels = st.checkbox(
             "顯示長度標籤",
-            value=VISUALIZATION_CONFIG['display_labels'],
+            key='display_labels',
             help="是否顯示長度標籤"
         )
 
@@ -162,7 +226,7 @@ def main():
         line_color_option = st.selectbox(
             "線條顏色",
             options=["綠色", "紅色", "藍色", "白色", "黃色"],
-            index=0,
+            key='line_color_option',
             help="選擇線條的顏色"
         )
 
@@ -179,7 +243,7 @@ def main():
         st.info(f"📦 批次大小: {BATCH_SIZE} 張圖片")
         st.info("🚀 系統會自動進行批次推理以提高效率")
 
-    # 主要內容區域
+    # 主要內容區域保持不變
     if st.session_state.predictor is None:
         st.error("⚠️ 模型未載入，無法進行分析")
         st.info("📝 請檢查模型檔案路徑是否正確")
@@ -248,7 +312,7 @@ def main():
             progress_bar.progress(1.0)
             status_text.text("✅ 批次處理完成！")
 
-        # 顯示結果
+        # 顯示結果 (保持原有的結果顯示邏輯)
         if st.session_state.processed_results:
             st.subheader("📊 分析結果")
 
@@ -476,7 +540,6 @@ def main():
 
                 # 處理效率顯示
                 st.metric("📊 處理效率", f"{len(successful_results)} 張成功")
-
 
 if __name__ == "__main__":
     main()

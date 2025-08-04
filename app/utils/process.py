@@ -5,7 +5,13 @@ from typing import List, Tuple, Union
 from PIL import Image
 
 from utils.image_utils import batch_resize_with_cleanup, convert_pil_to_temp_files
-from config import *
+from config import (
+    BATCH_SIZE,
+    TARGET_SIZE,
+    LINE_EXTRACTION_CONFIG,
+    VISUALIZATION_CONFIG,
+    YOLO_CONFIG,
+)
 from line_extractor import LineExtractor
 from visualizer import Visualizer
 from yolo_predictor import YOLOPredictor

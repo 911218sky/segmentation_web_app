@@ -1,13 +1,16 @@
 from pathlib import Path
 
 # 路徑配置
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 TEMP_DIR = BASE_DIR / "temp"
 OUTPUT_DIR = BASE_DIR / "output"
 
 # 配置設定
 WEIGHTS_PATH = BASE_DIR / "models" / "best.pt"  # 本地模型路徑
 BATCH_SIZE = 32  # 批次處理大小
+
+# 圖片大小配置 (將輸入圖片統一大小)
+TARGET_SIZE = (1024, 1024)
 
 # 模型配置
 YOLO_CONFIG = {
@@ -47,5 +50,18 @@ LINE_EXTRACTION_CONFIG = {
     'keep_ratio': 0.25               # 保留的寬度比例
 }
 
-# 圖片大小配置 (將輸入圖片統一大小)
-TARGET_SIZE = (1024, 1024)
+# 預設設定組合 - 修正為嵌套結構
+DEFAULT_CONFIGS = {
+    "系統預設": {
+        'pixel_size_mm': PROCESSING_CONFIG['pixel_size_mm'],
+        'confidence_threshold': YOLO_CONFIG['conf'], 
+        'sample_interval': LINE_EXTRACTION_CONFIG['sample_interval'],
+        'gradient_search_top': LINE_EXTRACTION_CONFIG['gradient_search_top'],
+        'gradient_search_bottom': LINE_EXTRACTION_CONFIG['gradient_search_bottom'],
+        'keep_ratio': LINE_EXTRACTION_CONFIG['keep_ratio'],
+        'line_thickness': VISUALIZATION_CONFIG['line_thickness'],
+        'line_alpha': VISUALIZATION_CONFIG['line_alpha'],
+        'display_labels': VISUALIZATION_CONFIG['display_labels'],
+        'line_color_option': '綠色'
+    },
+}
