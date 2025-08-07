@@ -6,7 +6,7 @@ TEMP_DIR = BASE_DIR / "temp"
 OUTPUT_DIR = BASE_DIR / "output"
 
 # 配置設定
-WEIGHTS_PATH = BASE_DIR / "models" / "best.pt"  # 本地模型路徑
+WEIGHTS_PATH = BASE_DIR / "models" / "best_v2.pt"  # 本地模型路徑
 BATCH_SIZE = 32  # 批次處理大小
 
 # 圖片大小配置 (將輸入圖片統一大小)
@@ -47,7 +47,9 @@ LINE_EXTRACTION_CONFIG = {
     'sample_interval': 5,           # x 軸採樣步距
     'gradient_search_top': 20,       # 往上搜尋的最大像素距離
     'gradient_search_bottom': 20,    # 往下搜尋的最大像素距離
-    'keep_ratio': 0.25               # 保留的寬度比例
+    'keep_ratio': 0.25,               # 保留的寬度比例
+    'window_size': 5,                 # 平滑過濾視窗大小
+    'threshold': 0.1                  # 平滑過濾閾值
 }
 
 # 預設設定組合 - 修正為嵌套結構

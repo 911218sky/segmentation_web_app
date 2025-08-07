@@ -1,6 +1,7 @@
 from typing import List, Tuple
 import numpy as np
 import cv2
+from config import LINE_EXTRACTION_CONFIG
 
 class LineExtractor:
     """
@@ -13,10 +14,10 @@ class LineExtractor:
     def extract_vertical_lines_from_mask(
         img: np.ndarray,
         mask: np.ndarray,
-        sample_interval: int = 10,
-        gradient_search_top: int = 20,
-        gradient_search_bottom: int = 20,
-        keep_ratio: float = 0.5,
+        sample_interval: int = LINE_EXTRACTION_CONFIG['sample_interval'],
+        gradient_search_top: int = LINE_EXTRACTION_CONFIG['gradient_search_top'],
+        gradient_search_bottom: int = LINE_EXTRACTION_CONFIG['gradient_search_bottom'],
+        keep_ratio: float = LINE_EXTRACTION_CONFIG['keep_ratio'],
         region: Tuple[int, int, int, int] = None  # (left, top, right, bottom)
     ) -> List[Tuple[int, int, int]]:
         if img is None or mask is None:
@@ -75,8 +76,8 @@ class LineExtractor:
 
         # 平滑過濾
         lines = LineExtractor._filter_with_smoothing(lines,
-                                                    window_size=10, 
-                                                    threshold=0.1)
+                                                    window_size=LINE_EXTRACTION_CONFIG['window_size'], 
+                                                    threshold=LINE_EXTRACTION_CONFIG['threshold'])
         return lines
 
     @staticmethod
