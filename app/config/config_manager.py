@@ -1,10 +1,11 @@
 import streamlit as st
 import json
 from streamlit_local_storage import LocalStorage
-from config import DEFAULT_CONFIGS
+from .config import DEFAULT_CONFIGS
 
 # 初始化瀏覽器本地存儲
-localS = LocalStorage()
+STORAGE_KEY = "vessel_saved_configs"
+localS = LocalStorage(STORAGE_KEY)
 
 def initialize_session_state():
     """初始化 session state 配置值"""
@@ -18,7 +19,7 @@ def initialize_session_state():
 def load_saved_configs():
     """從瀏覽器載入保存的設定"""
     try:
-        saved_configs = localS.getItem("vessel_saved_configs")
+        saved_configs = localS.getItem(STORAGE_KEY)
         if saved_configs:
             configs = json.loads(saved_configs) if isinstance(saved_configs, str) else saved_configs
             all_configs = DEFAULT_CONFIGS.copy()
@@ -43,13 +44,12 @@ def save_config_to_browser(config_name, config):
     try:
         # 載入現有設定
         current_configs = load_saved_configs()
-        
         # 只保存非預設的設定
         user_configs = {k: v for k, v in current_configs.items() if k not in DEFAULT_CONFIGS}
         user_configs[config_name] = config
         
         # 儲存到瀏覽器
-        localS.setItem("vessel_saved_configs", json.dumps(user_configs, ensure_ascii=False))
+        localS.setItem(STORAGE_KEY, json.dumps(user_configs, ensure_ascii=False))
         return True
     except Exception as e:
         st.error(f"儲存設定失敗: {str(e)}")
@@ -82,6 +82,7 @@ def get_current_config():
     """獲取當前的配置參數"""
     default_config = DEFAULT_CONFIGS["系統預設"]
     return {
+        "selected_model": st.session_state.get('selected_model', default_config['selected_model']),
         "pixel_size_mm": st.session_state.get('pixel_size_mm', default_config['pixel_size_mm']),
         "confidence_threshold": st.session_state.get('confidence_threshold', default_config['confidence_threshold']),
         "sample_interval": st.session_state.get('sample_interval', default_config['sample_interval']),

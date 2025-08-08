@@ -3,20 +3,17 @@ import streamlit as st
 import sys
 import zipfile
 from io import BytesIO
-from pathlib import Path
 import time
-from config.config_manager import *
 import numpy as np
 from PIL import Image
 
-# 添加模組路徑
-current_dir = Path(__file__).resolve().parent
-sys.path.append(str(current_dir))
+sys.path.append("../yolov12")
 
 from config import (
     BATCH_SIZE,
-    WEIGHTS_PATH,
     DEFAULT_CONFIGS,
+    AVAILABLE_MODELS,
+    DEFAULT_MODEL,
 )
 from config.config_manager import ( 
     load_saved_configs,
@@ -26,9 +23,12 @@ from config.config_manager import (
     initialize_session_state,
     get_current_config
 )
+from config.model import (
+    get_model_path,
+    switch_model
+)
 from utils.excel import generate_csv_from_results, generate_excel_from_results
 from utils.process import process_batch_images
-from yolo_predictor import YOLOPredictor
 
 # 頁面配置
 st.set_page_config(
@@ -42,20 +42,8 @@ if 'predictor' not in st.session_state:
     st.session_state.predictor = None
 if 'processed_results' not in st.session_state:
     st.session_state.processed_results = []
-
-@st.cache_resource
-def load_model(weights_path):
-    """載入並快取 YOLO 模型"""
-    try:
-        if not Path(weights_path).exists():
-            st.error(f"模型檔案不存在: {weights_path}")
-            return None
-
-        predictor = YOLOPredictor(Path(weights_path))
-        return predictor
-    except Exception as e:
-        st.error(f"模型載入失敗: {str(e)}")
-        return None
+if 'current_model_name' not in st.session_state:
+    st.session_state.current_model_name = None
 
 def main():
     st.title("🔬 血管分割與測量系統")
@@ -64,22 +52,52 @@ def main():
     # 初始化配置
     initialize_session_state()
 
-    # 自動載入本地模型
-    if st.session_state.predictor is None:
-        with st.spinner("正在載入本地模型..."):
-            st.session_state.predictor = load_model(WEIGHTS_PATH)
-
     # 側邊欄配置
     with st.sidebar:
         st.header("⚙️ 系統配置")
 
+        # 模型選擇區域 - 新增
+        st.subheader("🤖 模型選擇")
+        
+        # 模型選擇下拉選單
+        selected_model = st.selectbox(
+            "選擇分析模型",
+            options=list(AVAILABLE_MODELS.keys()),
+            index=list(AVAILABLE_MODELS.keys()).index(st.session_state.get('selected_model', DEFAULT_MODEL)),
+            key='model_selector',
+            help="選擇要使用的血管分割模型"
+        )
+        
+        # 顯示當前模型資訊
+        if st.session_state.current_model_name:
+            st.info(f"🎯 當前模型: {st.session_state.current_model_name}")
+        
+        # 模型切換按鈕
+        if st.button("🔄 切換模型", type="secondary"):
+            switch_model(selected_model)
+
+        # 自動載入預設模型（如果還沒載入）
+        if st.session_state.predictor is None:
+            current_model = st.session_state.get('selected_model', DEFAULT_MODEL)
+            switch_model(current_model)
+
         # 模型狀態顯示
         st.subheader("模型狀態")
         if st.session_state.predictor is not None:
-            st.success(f"✅ 模型已載入")
+            st.success(f"✅ 模型已載入: {st.session_state.current_model_name}")
+            
+            # 顯示模型檔案路徑
+            model_path = get_model_path(st.session_state.current_model_name)
+            st.caption(f"📁 檔案: {model_path.name}")
         else:
             st.error("❌ 模型載入失敗")
-            st.info(f"請確認模型檔案存在於: {WEIGHTS_PATH}")
+            available_models_info = []
+            for name, filename in AVAILABLE_MODELS.items():
+                model_path = get_model_path(name)
+                status = "✅" if model_path.exists() else "❌"
+                available_models_info.append(f"{status} {name}: {filename}")
+            
+            st.info("📋 可用模型狀態:\n" + "\n".join(available_models_info))
 
         # 設定管理區域
         st.subheader("💾 設定管理")
@@ -99,6 +117,10 @@ def main():
             if st.button("🚀 套用設定", type="primary"):
                 if selected_config in available_configs:
                     apply_config(available_configs[selected_config])
+                    # 如果設定包含不同的模型，也要切換模型
+                    config_model = available_configs[selected_config].get('selected_model')
+                    if config_model and config_model != st.session_state.current_model_name:
+                        switch_model(config_model)
                     st.success(f"✅ 已套用「{selected_config}」設定")
                     time.sleep(0.5)
                     st.rerun()

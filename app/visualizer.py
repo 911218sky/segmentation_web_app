@@ -100,7 +100,7 @@ class Visualizer:
         # 標出平均長度
         if lengths_mm:
             avg = float(np.mean(lengths_mm))
-            bottom_text = f"Mean length: {avg:.1f} mm"
+            bottom_text = f"Mean length: {avg:.2f} mm"
             (tw, th), _ = cv2.getTextSize(bottom_text, font, 0.2, font_thickness)
 
             # 水平置中

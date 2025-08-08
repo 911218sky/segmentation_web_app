@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import shutil
 from typing import List, Tuple, Union
 from PIL import Image
 
