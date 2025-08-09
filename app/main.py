@@ -146,7 +146,6 @@ def render_settings_section():
                 if config_model and config_model != st.session_state.current_model_name:
                     switch_model(config_model)
                 st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
-                time.sleep(0.5)
                 st.rerun()
     
     with col2:
@@ -155,7 +154,6 @@ def render_settings_section():
             if can_delete:
                 if delete_config_from_browser(selected_config):
                     st.success(f"✅ {get_text('config_deleted')}「{selected_config}」設定")
-                    time.sleep(0.5)
                     st.rerun()
                 else:
                     st.error(get_text('delete_failed'))
@@ -177,7 +175,6 @@ def render_settings_section():
             current_config = get_current_config()
             if save_config_to_browser(new_config_name, current_config):
                 st.success(f"✅ 設定「{new_config_name}」{get_text('config_saved')}")
-                time.sleep(0.5)
                 st.rerun()
             else:
                 st.error(get_text('save_failed'))
@@ -188,6 +185,7 @@ def render_parameters_section():
     """渲染參數配置區域"""
     # 基本處理參數
     st.subheader(get_text('basic_params'))
+    
     pixel_size_mm = st.number_input(
         get_text('pixel_size'),
         min_value=0.01,
@@ -283,7 +281,7 @@ def render_parameters_section():
         get_text('line_color'),
         options=list(color_options.keys()),
         key='line_color_option',
-        help=get_text('line_color_help')
+        help=get_text('line_color_help'),
     )
     
     line_color = color_options.get(line_color_option, (0, 255, 0))
@@ -502,13 +500,13 @@ def main():
     
     # 初始化應用狀態
     initialize_app_state()
+    
+    # 初始化配置
+    initialize_session_state()
 
     # 主標題
     st.title(get_text('main_title'))
     st.markdown("---")
-
-    # 初始化配置
-    initialize_session_state()
 
     # 側邊欄配置
     with st.sidebar:

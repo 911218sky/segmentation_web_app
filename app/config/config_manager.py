@@ -2,11 +2,16 @@ import json
 import streamlit as st
 from .config import DEFAULT_CONFIGS, STORAGE_KEY
 
+_local_storage_instance = None
+
 def _get_local_storage():
     """延遲初始化 LocalStorage，避免頂層副作用"""
     try:
         from streamlit_local_storage import LocalStorage
-        return LocalStorage(STORAGE_KEY)
+        global _local_storage_instance
+        if _local_storage_instance is None:
+            _local_storage_instance = LocalStorage(STORAGE_KEY)
+        return _local_storage_instance
     except ImportError:
         st.error("請安裝 streamlit-local-storage: pip install streamlit-local-storage")
         return None
