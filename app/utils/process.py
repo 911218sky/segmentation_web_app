@@ -100,7 +100,7 @@ def process_batch_images(
                             # 計算統計數據
                             lengths_mm = [abs(y2 - y1) * pixel_size_mm for _, y1, y2 in vertical_lines]
                             stats = {
-                                'confidence': confidence,
+                                'confidence': confidence.item(),
                                 'num_lines': len(vertical_lines),
                                 'mean_length': np.mean(lengths_mm) if lengths_mm else 0,
                                 'std_length': np.std(lengths_mm) if lengths_mm else 0,

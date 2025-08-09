@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 from yolo_predictor import YOLOPredictor
 
 from .config import AVAILABLE_MODELS, DEFAULT_MODEL, MODELS_DIR

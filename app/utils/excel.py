@@ -1,9 +1,9 @@
 import pandas as pd
 from io import BytesIO
 from typing import List, Dict, Any
+import numpy as np
 
-def generate_excel_from_results(results: List[Dict[str, Any]], 
-                               config_params: Dict[str, Any] = None) -> BytesIO:
+def generate_excel_from_results(results: List[Dict[str, Any]]) -> BytesIO:
     """
     從分析結果生成 Excel 檔案
     
@@ -21,12 +21,12 @@ def generate_excel_from_results(results: List[Dict[str, Any]],
             stats = r['stats']
             main_data.append({
                 '檔案名稱': r['filename'],
-                '檢測信心度': round(stats.get('confidence', 0), 4),
+                '檢測信心度': np.round(stats.get('confidence', 0), 3),
                 '測量線條數量': stats.get('num_lines', 0),
-                '平均長度 (mm)': round(stats.get('mean_length', 0), 3),
-                '標準差 (mm)': round(stats.get('std_length', 0), 3),
-                '最大長度 (mm)': round(stats.get('max_length', 0), 3),
-                '最小長度 (mm)': round(stats.get('min_length', 0), 3),
+                '平均長度 (mm)': np.round(stats.get('mean_length', 0), 3),
+                '標準差 (mm)': np.round(stats.get('std_length', 0), 3),
+                '最大長度 (mm)': np.round(stats.get('max_length', 0), 3),
+                '最小長度 (mm)': np.round(stats.get('min_length', 0), 3),
                 '處理狀態': '成功'
             })
         else:
@@ -54,13 +54,13 @@ def generate_excel_from_results(results: List[Dict[str, Any]],
             {'統計項目': '總圖片數量', '數值': len(results), '單位': '張'},
             {'統計項目': '成功處理數量', '數值': len(successful_results), '單位': '張'},
             {'統計項目': '失敗處理數量', '數值': len(results) - len(successful_results), '單位': '張'},
-            {'統計項目': '成功率', '數值': round(len(successful_results) / len(results) * 100, 1), '單位': '%'},
-            {'統計項目': '平均檢測信心度', '數值': round(sum(all_confidences) / len(all_confidences), 4), '單位': ''},
+            {'統計項目': '成功率', '數值': np.round(len(successful_results) / len(results) * 100, 1), '單位': '%'},
+            {'統計項目': '平均檢測信心度', '數值': np.round(sum(all_confidences) / len(all_confidences), 3), '單位': ''},
             {'統計項目': '總測量線條數', '數值': sum(all_num_lines), '單位': '條'},
-            {'統計項目': '平均線條數量', '數值': round(sum(all_num_lines) / len(all_num_lines), 1), '單位': '條/張'},
-            {'統計項目': '整體平均長度', '數值': round(sum(all_mean_lengths) / len(all_mean_lengths), 3), '單位': 'mm'},
-            {'統計項目': '最大平均長度', '數值': round(max(all_mean_lengths), 3), '單位': 'mm'},
-            {'統計項目': '最小平均長度', '數值': round(min(all_mean_lengths), 3), '單位': 'mm'},
+            {'統計項目': '平均線條數量', '數值': np.round(sum(all_num_lines) / len(all_num_lines), 1), '單位': '條/張'},
+            {'統計項目': '整體平均長度', '數值': np.round(sum(all_mean_lengths) / len(all_mean_lengths), 3), '單位': 'mm'},
+            {'統計項目': '最大平均長度', '數值': np.round(max(all_mean_lengths), 3), '單位': 'mm'},
+            {'統計項目': '最小平均長度', '數值': np.round(min(all_mean_lengths), 3), '單位': 'mm'},
         ]
     else:
         summary_data = [
@@ -69,26 +69,10 @@ def generate_excel_from_results(results: List[Dict[str, Any]],
             {'統計項目': '失敗處理數量', '數值': len(results), '單位': '張'},
             {'統計項目': '成功率', '數值': 0, '單位': '%'},
         ]
-    
-    # 準備配置參數數據
-    config_data = []
-    if config_params:
-        config_data = [
-            {'參數類別': '基本參數', '參數名稱': '像素大小', '數值': config_params.get('pixel_size_mm', 'N/A'), '單位': 'mm/pixel'},
-            {'參數類別': '基本參數', '參數名稱': '信心度閾值', '數值': config_params.get('confidence_threshold', 'N/A'), '單位': ''},
-            {'參數類別': '線條提取', '參數名稱': '採樣間隔', '數值': config_params.get('sample_interval', 'N/A'), '單位': '像素'},
-            {'參數類別': '線條提取', '參數名稱': '往上搜尋距離', '數值': config_params.get('gradient_search_top', 'N/A'), '單位': '像素'},
-            {'參數類別': '線條提取', '參數名稱': '往下搜尋距離', '數值': config_params.get('gradient_search_bottom', 'N/A'), '單位': '像素'},
-            {'參數類別': '線條提取', '參數名稱': '保留寬度比例', '數值': config_params.get('keep_ratio', 'N/A'), '單位': ''},
-            {'參數類別': '視覺化', '參數名稱': '線條顏色', '數值': config_params.get('line_color_option', 'N/A'), '單位': ''},
-            {'參數類別': '視覺化', '參數名稱': '線條粗細', '數值': config_params.get('line_thickness', 'N/A'), '單位': ''},
-            {'參數類別': '視覺化', '參數名稱': '線條透明度', '數值': config_params.get('line_alpha', 'N/A'), '單位': ''},
-        ]
-    
+
     # 創建 DataFrame
     main_df = pd.DataFrame(main_data)
     summary_df = pd.DataFrame(summary_data)
-    config_df = pd.DataFrame(config_data)
     
     # 創建 Excel 檔案
     output = BytesIO()
@@ -98,13 +82,6 @@ def generate_excel_from_results(results: List[Dict[str, Any]],
         
         # 寫入統計摘要
         summary_df.to_excel(writer, sheet_name='統計摘要', index=False)
-        
-        # 寫入配置參數
-        if config_data:
-            config_df.to_excel(writer, sheet_name='配置參數', index=False)
-        
-        # 獲取工作簿以進行格式化
-        workbook = writer.book
         
         # 格式化主要結果工作表
         main_worksheet = writer.sheets['詳細測量結果']
@@ -122,14 +99,6 @@ def generate_excel_from_results(results: List[Dict[str, Any]],
         summary_worksheet.column_dimensions['A'].width = 20
         summary_worksheet.column_dimensions['B'].width = 15
         summary_worksheet.column_dimensions['C'].width = 10
-        
-        # 格式化配置參數工作表
-        if config_data:
-            config_worksheet = writer.sheets['配置參數']
-            config_worksheet.column_dimensions['A'].width = 15
-            config_worksheet.column_dimensions['B'].width = 20
-            config_worksheet.column_dimensions['C'].width = 15
-            config_worksheet.column_dimensions['D'].width = 10
     
     output.seek(0)
     return output
@@ -150,12 +119,12 @@ def generate_csv_from_results(results: List[Dict[str, Any]]) -> str:
             stats = r['stats']
             data.append({
                 '檔案名稱': r['filename'],
-                '檢測信心度': round(stats.get('confidence', 0), 4),
+                '檢測信心度': np.round(stats.get('confidence', 0), 4),
                 '測量線條數量': stats.get('num_lines', 0),
-                '平均長度(mm)': round(stats.get('mean_length', 0), 3),
-                '標準差(mm)': round(stats.get('std_length', 0), 3),
-                '最大長度(mm)': round(stats.get('max_length', 0), 3),
-                '最小長度(mm)': round(stats.get('min_length', 0), 3),
+                '平均長度(mm)': np.round(stats.get('mean_length', 0), 3),
+                '標準差(mm)': np.round(stats.get('std_length', 0), 3),
+                '最大長度(mm)': np.round(stats.get('max_length', 0), 3),
+                '最小長度(mm)': np.round(stats.get('min_length', 0), 3),
                 '處理狀態': '成功'
             })
         else:

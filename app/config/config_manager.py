@@ -1,11 +1,18 @@
-import streamlit as st
 import json
-from streamlit_local_storage import LocalStorage
-from .config import DEFAULT_CONFIGS
+import streamlit as st
+from .config import DEFAULT_CONFIGS, STORAGE_KEY
 
-# 初始化瀏覽器本地存儲
-STORAGE_KEY = "vessel_saved_configs"
-localS = LocalStorage(STORAGE_KEY)
+def _get_local_storage():
+    """延遲初始化 LocalStorage，避免頂層副作用"""
+    try:
+        from streamlit_local_storage import LocalStorage
+        return LocalStorage(STORAGE_KEY)
+    except ImportError:
+        st.error("請安裝 streamlit-local-storage: pip install streamlit-local-storage")
+        return None
+    except Exception as e:
+        st.error(f"LocalStorage 初始化失敗: {str(e)}")
+        return None
 
 def initialize_session_state():
     """初始化 session state 配置值"""
@@ -19,6 +26,10 @@ def initialize_session_state():
 def load_saved_configs():
     """從瀏覽器載入保存的設定"""
     try:
+        localS = _get_local_storage()
+        if localS is None:
+            return DEFAULT_CONFIGS.copy()
+            
         saved_configs = localS.getItem(STORAGE_KEY)
         if saved_configs:
             configs = json.loads(saved_configs) if isinstance(saved_configs, str) else saved_configs
@@ -27,14 +38,18 @@ def load_saved_configs():
             return all_configs
         else:
             return DEFAULT_CONFIGS.copy()
+            
     except (json.JSONDecodeError, TypeError, AttributeError) as e:
         st.error(f"載入設定失敗: {str(e)}")
         # 清除損壞的數據
         try:
-            localS.deleteItem("vessel_saved_configs")
-        except:
-            pass
+            localS = _get_local_storage()
+            if localS:
+                localS.deleteItem(STORAGE_KEY)
+        except Exception as e2:
+            st.error(f"清除損壞的數據失敗: {str(e2)}")
         return DEFAULT_CONFIGS.copy()
+        
     except Exception as e:
         st.error(f"載入設定失敗: {str(e)}")
         return DEFAULT_CONFIGS.copy()
@@ -42,15 +57,17 @@ def load_saved_configs():
 def save_config_to_browser(config_name, config):
     """儲存設定到瀏覽器"""
     try:
-        # 載入現有設定
+        localS = _get_local_storage()
+        if localS is None:
+            return False
+            
         current_configs = load_saved_configs()
-        # 只保存非預設的設定
         user_configs = {k: v for k, v in current_configs.items() if k not in DEFAULT_CONFIGS}
         user_configs[config_name] = config
         
-        # 儲存到瀏覽器
         localS.setItem(STORAGE_KEY, json.dumps(user_configs, ensure_ascii=False))
         return True
+        
     except Exception as e:
         st.error(f"儲存設定失敗: {str(e)}")
         return False
@@ -61,14 +78,19 @@ def delete_config_from_browser(config_name):
         if config_name in DEFAULT_CONFIGS:
             return False  # 不能刪除預設設定
             
+        localS = _get_local_storage()
+        if localS is None:
+            return False
+            
         current_configs = load_saved_configs()
         user_configs = {k: v for k, v in current_configs.items() if k not in DEFAULT_CONFIGS}
         
         if config_name in user_configs:
             del user_configs[config_name]
-            localS.setItem("vessel_saved_configs", json.dumps(user_configs, ensure_ascii=False))
+            localS.setItem(STORAGE_KEY, json.dumps(user_configs, ensure_ascii=False))
             return True
         return False
+        
     except Exception as e:
         st.error(f"刪除設定失敗: {str(e)}")
         return False
@@ -92,5 +114,5 @@ def get_current_config():
         "line_thickness": st.session_state.get('line_thickness', default_config['line_thickness']),
         "line_alpha": st.session_state.get('line_alpha', default_config['line_alpha']),
         "display_labels": st.session_state.get('display_labels', default_config['display_labels']),
-        "line_color_option": st.session_state.get('line_color_option', default_config['line_color_option'])
+        "line_color_option": st.session_state.get('line_color_option', default_config['line_color_option']),
     }
