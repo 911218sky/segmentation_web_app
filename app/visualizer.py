@@ -56,7 +56,7 @@ class Visualizer:
         lines: List[Tuple[int, int, int]],
         pixel_size_mm: float,
         font=cv2.FONT_HERSHEY_SIMPLEX,
-        font_thickness: int = 2, 
+        font_thickness: int = 1, 
         display_labels: bool = True,
         label_font_scale: float = 0.2,
         bottom_font_scale: float = 1.0,
@@ -83,19 +83,17 @@ class Visualizer:
             lengths_mm.append(mm)
 
             if display_labels:
-                # 標出長度
                 text = f"{mm:.1f} mm"
                 (tw, th), _ = cv2.getTextSize(text, font, label_font_scale, font_thickness)
-
-                text_x = x - tw // 2
-                text_y = max(y1 - 15, th + box_pad)
-
-                # background rectangle coords
-                top_left  = (text_x - box_pad, text_y - th - box_pad)
-                bot_right = (text_x + tw + box_pad, text_y + box_pad)
-
-                cv2.rectangle(vis, top_left, bot_right, (0, 0, 0), -1) 
-                cv2.putText(vis, text, (text_x, text_y), font, label_font_scale,
+                
+                text_x = int(x - tw // 2)
+                text_y = int(max(y1 - 15, th + box_pad))
+                
+                cv2.putText(vis, text, (text_x, text_y), 
+                            font, label_font_scale,
+                            (0, 0, 0), font_thickness + 1, cv2.LINE_AA)
+                cv2.putText(vis, text, (text_x, text_y), 
+                            font, label_font_scale,
                             (255, 255, 255), font_thickness, cv2.LINE_AA)
 
         # 標出平均長度

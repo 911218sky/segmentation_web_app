@@ -7,4 +7,5 @@ __pycache__/
 venv/
 *.whl
 models
+wheels
 user_configs

@@ -1,0 +1,23 @@
+[server]
+# 開發環境配置
+port = 3012
+address = "localhost"
+runOnSave = true
+fileWatcherType = "auto"
+headless = false
+enableCORS = true
+enableXsrfProtection = false
+maxUploadSize = 200
+allowRunOnSave = true
+enableStaticServing = false
+
+[logger]
+# 開發環境詳細日誌
+level = "debug"
+messageFormat = "%(asctime)s %(message)s"
+
+[browser]
+# 開發環境瀏覽器配置
+gatherUsageStats = true
+serverAddress = "localhost"
+serverPort = 3012

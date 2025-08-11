@@ -42,7 +42,7 @@ def setup_page_config():
     st.set_page_config(
         page_title=get_text('page_title'),
         page_icon=get_text('page_icon'),
-        layout="wide"
+        layout="wide",
     )
 
 # 初始化 session state
@@ -53,6 +53,9 @@ def initialize_app_state():
         st.session_state.processed_results = []
     if 'current_model_name' not in st.session_state:
         st.session_state.current_model_name = None
+    if 'file_manager_initialized' not in st.session_state:
+        file_storage_manager.initialize_session_state()
+        st.session_state.file_manager_initialized = True
 
 def render_language_selector():
     """渲染語言選擇器"""
@@ -137,7 +140,7 @@ def render_settings_section():
     with col1:
         if st.button(get_text('apply_config'), type="primary"):
             if selected_config in available_configs:
-                apply_config(available_configs[selected_config])
+                file_storage_manager.apply_config(available_configs[selected_config])
                 # 如果設定包含不同的模型，也要切換模型
                 config_model = available_configs[selected_config].get('selected_model')
                 if config_model and config_model != st.session_state.current_model_name:
@@ -505,9 +508,6 @@ def main():
     
     # 初始化應用狀態
     initialize_app_state()
-    
-    # 初始化配置
-    file_storage_manager.initialize_session_state()
 
     # 主標題
     st.title(get_text('main_title'))
