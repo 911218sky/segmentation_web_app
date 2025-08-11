@@ -56,8 +56,10 @@ class Visualizer:
         lines: List[Tuple[int, int, int]],
         pixel_size_mm: float,
         font=cv2.FONT_HERSHEY_SIMPLEX,
-        font_thickness: int = 1,
+        font_thickness: int = 2,            # 增加字體粗細
         display_labels: bool = True,
+        label_font_scale: float = 0.8,      # 大幅增大標籤字體
+        bottom_font_scale: float = 1.0,     # 大幅增大底部文字字體
         **line_kwargs
     ) -> np.ndarray:
         """
@@ -73,7 +75,7 @@ class Visualizer:
         # 計算每條線的長度 (mm)
         h, w = vis.shape[:2]
         lengths_mm = []
-        box_pad = 2
+        box_pad = 8  # 大幅增大padding適應更大的字體
 
         for x, y1, y2 in lines:
             pixel_len = abs(y2 - y1)
@@ -83,35 +85,37 @@ class Visualizer:
             if display_labels:
                 # 標出長度
                 text = f"{mm:.1f} mm"
-                (tw, th), _ = cv2.getTextSize(text, font, 0.2, font_thickness)
+                (tw, th), _ = cv2.getTextSize(text, font, label_font_scale, font_thickness)
 
                 # center label horizontally on the line, place above y1
                 text_x = x - tw // 2
-                text_y = max(y1 - 4, th + box_pad)          # avoid going above image
+                text_y = max(y1 - 15, th + box_pad)  # 大幅增大間距
 
                 # background rectangle coords
                 top_left  = (text_x - box_pad, text_y - th - box_pad)
                 bot_right = (text_x + tw + box_pad, text_y + box_pad)
 
                 cv2.rectangle(vis, top_left, bot_right, (0, 0, 0), -1) 
-                cv2.putText(vis, text, (text_x, text_y), font, 0.2,
+                cv2.putText(vis, text, (text_x, text_y), font, label_font_scale,
                             (255, 255, 255), font_thickness, cv2.LINE_AA)
 
         # 標出平均長度
         if lengths_mm:
             avg = float(np.mean(lengths_mm))
             bottom_text = f"Mean length: {avg:.2f} mm"
-            (tw, th), _ = cv2.getTextSize(bottom_text, font, 0.2, font_thickness)
+            (tw, th), _ = cv2.getTextSize(bottom_text, font, bottom_font_scale, font_thickness)
 
-            # 水平置中
-            text_x = (w - tw) // 2
-            text_y = h - 6 
+            # 先計算整個背景框的寬度，然後置中
+            rect_width = tw + 2 * box_pad
+            rect_x = (w - rect_width) // 2
+            text_x = rect_x + box_pad
+            text_y = h - 20  # 大幅增大與底邊的距離
 
-            top_left  = (text_x - box_pad, text_y - th - box_pad)
-            bot_right = (text_x + tw + box_pad, text_y + box_pad)
+            top_left  = (rect_x, text_y - th - box_pad)
+            bot_right = (rect_x + rect_width, text_y + box_pad)
 
             cv2.rectangle(vis, top_left, bot_right, (0, 0, 0), -1)
-            cv2.putText(vis, bottom_text, (text_x, text_y), font, 1,
+            cv2.putText(vis, bottom_text, (text_x, text_y), font, bottom_font_scale,
                         (255, 255, 255), font_thickness, cv2.LINE_AA)
 
         return vis

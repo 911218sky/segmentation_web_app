@@ -3,7 +3,6 @@ import streamlit as st
 import sys
 import zipfile
 from io import BytesIO
-import time
 import numpy as np
 from PIL import Image
 from streamlit_chunked_upload import uploader as chunked_uploader
