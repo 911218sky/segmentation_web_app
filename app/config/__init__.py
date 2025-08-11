@@ -16,12 +16,7 @@ from .config import (
 )
 
 from .config_manager import (
-    load_saved_configs,
-    save_config_to_browser,
-    delete_config_from_browser,
-    apply_config,
-    initialize_session_state,
-    get_current_config,
+    FileStorageManager
 )
 
 from .model import (
@@ -52,12 +47,7 @@ __all__ = [
     "MODELS_DIR",
     
     # from config_manager
-    "load_saved_configs",
-    "save_config_to_browser",
-    "delete_config_from_browser",
-    "apply_config",
-    "initialize_session_state",
-    "get_current_config",
+    "FileStorageManager",
     
     # from model
     "get_model_path",

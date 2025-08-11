@@ -1,9 +1,10 @@
 import cv2
 import numpy as np
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 from PIL import Image
 
-from utils.image_utils import batch_resize_with_cleanup, convert_pil_to_temp_files
+from utils.image_utils import batch_resize_with_cleanup, convert_pil_to_temp_files 
+from utils.canvas import convert_original_xywh_to_resized
 from config import (
     BATCH_SIZE,
     TARGET_SIZE,
@@ -20,7 +21,9 @@ def process_batch_images(
     predictor: YOLOPredictor,
     images: List[Tuple[str, Image.Image]],
     pixel_size_mm: float = 0.30,
-    conf_threshold: float = 0.25, 
+    conf_threshold: float = 0.25,
+    # (x, y, w, h)
+    region: Optional[Tuple[int, int, int, int]] = None,
     line_config: Union[dict, None] = None,
     vis_config: Union[dict, None] = None):
     """批次處理多張圖片"""
@@ -52,6 +55,11 @@ def process_batch_images(
                 target_size=TARGET_SIZE
             )
             
+            # 如果輸入 region 則使用第一個圖片的 scale 和 padding 來轉換 region
+            if region is not None and i == 0:
+                # 使用第一個圖片的 scale 和 padding 來轉換 region
+                region = convert_original_xywh_to_resized(region, info_list[0]['scale'], info_list[0]['padding'])
+            
             # 獲取資料夾路徑
             temp_dir = image_files[0].parent
             
@@ -79,10 +87,12 @@ def process_batch_images(
                             vertical_lines = line_extractor.extract_vertical_lines_from_mask(
                                 img=img,
                                 mask=mask,
+                                region=region,
                                 sample_interval=line_config['sample_interval'],
                                 gradient_search_top=line_config['gradient_search_top'],
                                 gradient_search_bottom=line_config['gradient_search_bottom'],
-                                keep_ratio=line_config['keep_ratio']
+                                # 如果輸入 region 則 keep_ratio 無效
+                                keep_ratio=line_config['keep_ratio'] if region is None else None
                             )
                             
                             # 視覺化 - 使用配置參數

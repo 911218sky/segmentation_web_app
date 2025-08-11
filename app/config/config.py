@@ -6,6 +6,10 @@ TEMP_DIR = BASE_DIR / "temp"
 OUTPUT_DIR = BASE_DIR / "output"
 MODELS_DIR = BASE_DIR / "models"
 
+# 配置檔案路徑
+STORAGE_DIR = BASE_DIR / "user_configs"
+CONFIG_FILE = STORAGE_DIR / "saved_configs.json"
+
 # 可用模型配置
 AVAILABLE_MODELS = {
     "v1.0": "best.pt",
@@ -53,6 +57,7 @@ VISUALIZATION_CONFIG = {
     "max_point_color": (0, 0, 255), # 紅色
     "show_points": False,           # 顯示點
     "display_labels": True,         # 顯示標籤
+    "region_limit": True,          # 是否開啟區域限制
 }
 
 # 線條提取配置
@@ -87,6 +92,7 @@ DEFAULT_CONFIGS = {
         "line_thickness": VISUALIZATION_CONFIG["line_thickness"],
         "line_alpha": VISUALIZATION_CONFIG["line_alpha"],
         "display_labels": VISUALIZATION_CONFIG["display_labels"],
+        "region_limit": VISUALIZATION_CONFIG["region_limit"],
         "line_color_option": "綠色",
     }
 }

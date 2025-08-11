@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import numpy as np
 import cv2
 from config import LINE_EXTRACTION_CONFIG
@@ -17,17 +17,24 @@ class LineExtractor:
         sample_interval: int = LINE_EXTRACTION_CONFIG['sample_interval'],
         gradient_search_top: int = LINE_EXTRACTION_CONFIG['gradient_search_top'],
         gradient_search_bottom: int = LINE_EXTRACTION_CONFIG['gradient_search_bottom'],
-        keep_ratio: float = LINE_EXTRACTION_CONFIG['keep_ratio'],
-        region: Tuple[int, int, int, int] = None  # (left, top, right, bottom)
+        keep_ratio: Optional[float] = LINE_EXTRACTION_CONFIG['keep_ratio'],
+        region: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h)
     ) -> List[Tuple[int, int, int]]:
+        """
+        從血管分割遮罩產生垂直線，
+        並利用原始影像的灰階梯度，讓線貼齊血管壁。
+        支援區域限制功能。
+        
+        提示: 輸入 region 時，keep_ratio 將會無效
+        """
         if img is None or mask is None:
             return []
 
         # 如果指定了區域，先裁切圖片和遮罩
         if region is not None:
-            left, top, right, bottom = region
-            img = img[top:bottom, left:right]
-            mask = mask[top:bottom, left:right]
+            x, y, w, h = region
+            img = img[y:y+h, x:x+w]
+            mask = mask[y:y+h, x:x+w]
 
         # 轉灰階
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img.copy()
@@ -41,9 +48,12 @@ class LineExtractor:
         _, w = binary.shape
         lines: List[Tuple[int, int, int]] = []
 
-        # 計算 x 軸採樣範圍
-        border = int((1.0 - keep_ratio) / 2 * w)
-        x_start, x_end = border, w - border
+        # 計算 x 軸採樣範圍 (如果輸入 region 則裁切圖片和遮罩，並將 keep_ratio 設為 1.0)
+        if keep_ratio and region is None:
+            border = int((1.0 - keep_ratio) / 2 * w)
+            x_start, x_end = border, w - border
+        else:
+            x_start, x_end = 0, w
 
         for x in range(x_start, x_end, sample_interval):
             # 獲取二值化圖片中 x 軸的 y 座標

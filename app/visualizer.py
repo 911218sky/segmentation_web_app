@@ -56,10 +56,10 @@ class Visualizer:
         lines: List[Tuple[int, int, int]],
         pixel_size_mm: float,
         font=cv2.FONT_HERSHEY_SIMPLEX,
-        font_thickness: int = 2,            # 增加字體粗細
+        font_thickness: int = 2, 
         display_labels: bool = True,
-        label_font_scale: float = 0.8,      # 大幅增大標籤字體
-        bottom_font_scale: float = 1.0,     # 大幅增大底部文字字體
+        label_font_scale: float = 0.2,
+        bottom_font_scale: float = 1.0,
         **line_kwargs
     ) -> np.ndarray:
         """
@@ -75,7 +75,7 @@ class Visualizer:
         # 計算每條線的長度 (mm)
         h, w = vis.shape[:2]
         lengths_mm = []
-        box_pad = 8  # 大幅增大padding適應更大的字體
+        box_pad = 8
 
         for x, y1, y2 in lines:
             pixel_len = abs(y2 - y1)
@@ -87,9 +87,8 @@ class Visualizer:
                 text = f"{mm:.1f} mm"
                 (tw, th), _ = cv2.getTextSize(text, font, label_font_scale, font_thickness)
 
-                # center label horizontally on the line, place above y1
                 text_x = x - tw // 2
-                text_y = max(y1 - 15, th + box_pad)  # 大幅增大間距
+                text_y = max(y1 - 15, th + box_pad)
 
                 # background rectangle coords
                 top_left  = (text_x - box_pad, text_y - th - box_pad)
@@ -109,7 +108,7 @@ class Visualizer:
             rect_width = tw + 2 * box_pad
             rect_x = (w - rect_width) // 2
             text_x = rect_x + box_pad
-            text_y = h - 20  # 大幅增大與底邊的距離
+            text_y = h - 20 
 
             top_left  = (rect_x, text_y - th - box_pad)
             bot_right = (rect_x + rect_width, text_y + box_pad)

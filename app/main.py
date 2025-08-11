@@ -6,6 +6,7 @@ from io import BytesIO
 import numpy as np
 from PIL import Image
 from streamlit_chunked_upload import uploader as chunked_uploader
+from utils.canvas import render_canvas_section
 
 sys.path.append("../yolov12")
 
@@ -16,12 +17,7 @@ from config import (
     DEFAULT_MODEL,
     
     # config
-    load_saved_configs,
-    save_config_to_browser,
-    delete_config_from_browser,
-    apply_config,
-    initialize_session_state,
-    get_current_config,
+    FileStorageManager,
     
     # model
     get_model_path,
@@ -33,6 +29,8 @@ from config import (
 
 from utils.excel import generate_csv_from_results, generate_excel_from_results
 from utils.process import process_batch_images
+
+file_storage_manager = FileStorageManager()
 
 def initialize_language():
     """初始化語言設定"""
@@ -126,7 +124,7 @@ def render_settings_section():
     st.subheader(get_text('settings_management'))
     
     # 載入所有可用設定
-    available_configs = load_saved_configs()
+    available_configs = file_storage_manager.load_saved_configs()
     config_names = list(available_configs.keys())
     
     selected_config = st.selectbox(
@@ -151,7 +149,7 @@ def render_settings_section():
         can_delete = selected_config not in DEFAULT_CONFIGS
         if st.button(get_text('delete_config'), disabled=not can_delete):
             if can_delete:
-                if delete_config_from_browser(selected_config):
+                if file_storage_manager.delete_config_from_browser(selected_config):
                     st.success(f"✅ {get_text('config_deleted')}「{selected_config}」設定")
                     st.rerun()
                 else:
@@ -171,8 +169,8 @@ def render_settings_section():
     
     if st.button(get_text('save_config')):
         if new_config_name:
-            current_config = get_current_config()
-            if save_config_to_browser(new_config_name, current_config):
+            current_config = file_storage_manager.get_current_config()
+            if file_storage_manager.save_config_to_browser(new_config_name, current_config):
                 st.success(f"✅ 設定「{new_config_name}」{get_text('config_saved')}")
                 st.rerun()
             else:
@@ -266,6 +264,13 @@ def render_parameters_section():
         key='display_labels',
         help=get_text('display_labels_help')
     )
+    
+    # 是否開啟區域限制
+    region_limit = st.checkbox(
+        get_text('region_limit'),
+        key='region_limit',
+        help=get_text('region_limit_help')
+    )
 
     # 線條顏色選擇
     color_options = {
@@ -300,7 +305,8 @@ def render_parameters_section():
         'line_thickness': line_thickness,
         'line_alpha': line_alpha,
         'display_labels': display_labels,
-        'line_color': line_color
+        'line_color': line_color,
+        'region_limit': region_limit
     }
 
 def render_upload_section():
@@ -501,7 +507,7 @@ def main():
     initialize_app_state()
     
     # 初始化配置
-    initialize_session_state()
+    file_storage_manager.initialize_session_state()
 
     # 主標題
     st.title(get_text('main_title'))
@@ -533,8 +539,16 @@ def main():
 
     # 上傳區域
     uploaded_files = render_upload_section()
-        
+    
     if uploaded_files:
+        
+        # 是否開啟區域限制
+        if params['region_limit']:
+            # 繪製圖片區域 拿第一張圖片
+            selected_regions = render_canvas_section(uploaded_files[0])
+        else:
+            selected_regions = None
+        
         st.success(f"{get_text('uploaded_count')} {len(uploaded_files)} {get_text('images_text')}")
 
         # 處理選項
@@ -577,12 +591,13 @@ def main():
 
             # 批次處理
             st.session_state.processed_results = process_batch_images(
-                st.session_state.predictor,
-                images_data,
-                params['pixel_size_mm'],
-                params['confidence_threshold'],
-                line_config,
-                vis_config
+                predictor=st.session_state.predictor,
+                images=images_data,
+                pixel_size_mm=params['pixel_size_mm'],
+                conf_threshold=params['confidence_threshold'],
+                region=selected_regions,
+                line_config=line_config,
+                vis_config=vis_config
             )
 
             progress_bar.progress(1.0)
