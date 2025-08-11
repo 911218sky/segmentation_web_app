@@ -155,5 +155,6 @@ class FileStorageManager:
             "line_thickness": st.session_state.get('line_thickness', default_config['line_thickness']),
             "line_alpha": st.session_state.get('line_alpha', default_config['line_alpha']),
             "display_labels": st.session_state.get('display_labels', default_config['display_labels']),
+            "region_limit": st.session_state.get('region_limit', default_config['region_limit']),
             "line_color_option": st.session_state.get('line_color_option', default_config['line_color_option']),
         }

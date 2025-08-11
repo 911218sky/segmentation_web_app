@@ -44,7 +44,7 @@ YOLO_CONFIG = {
 
 # 處理配置
 PROCESSING_CONFIG = {
-    "pixel_size_mm": 0.01,  # 圖片像素大小 (mm)
+    "pixel_size_mm": 0.05,  # 圖片像素大小 (mm)
 }
 
 # 視覺化配置
@@ -63,9 +63,9 @@ VISUALIZATION_CONFIG = {
 # 線條提取配置
 LINE_EXTRACTION_CONFIG = {
     "sample_interval": 5,         # x 軸採樣步距
-    "gradient_search_top": 20,    # 往上搜尋的最大像素距離
-    "gradient_search_bottom": 20, # 往下搜尋的最大像素距離
-    "keep_ratio": 0.25,           # 保留的寬度比例
+    "gradient_search_top": 5,     # 往上搜尋的最大像素距離
+    "gradient_search_bottom": 5,  # 往下搜尋的最大像素距離
+    "keep_ratio": 0.3,           # 保留的寬度比例
     "window_size": 5,             # 平滑過濾視窗大小
     "threshold": 0.1,             # 平滑過濾閾值
 }
