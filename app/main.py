@@ -314,18 +314,18 @@ def render_parameters_section():
 
 def render_upload_section():
     """渲染上傳區域"""
-    # 分段上傳（大影片檔案）
-    st.subheader(get_text('video_upload'))
-    chunked_video = chunked_uploader(
-        get_text('select_video'),
-        key="video_uploader",
-        chunk_size=8,  # 8MB 分段
-        help=get_text('video_upload_help'),
-    )
+    # # 分段上傳（大影片檔案）
+    # st.subheader(get_text('video_upload'))
+    # chunked_video = chunked_uploader(
+    #     get_text('select_video'),
+    #     key="video_uploader",
+    #     chunk_size=8,  # 8MB 分段
+    #     help=get_text('video_upload_help'),
+    # )
     
-    if chunked_video is not None:
-        st.success(f"{get_text('video_uploaded')}: {chunked_video.name}")
-        st.info(f"{get_text('file_size')}: {chunked_video.size / (1024*1024):.1f} MB")
+    # if chunked_video is not None:
+    #     st.success(f"{get_text('video_uploaded')}: {chunked_video.name}")
+    #     st.info(f"{get_text('file_size')}: {chunked_video.size / (1024*1024):.1f} MB")
 
     # 圖片上傳區域
     st.subheader(get_text('image_upload'))

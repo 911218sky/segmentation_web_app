@@ -3,16 +3,7 @@
 port = 3012
 address = "0.0.0.0"
 runOnSave = false
-fileWatcherType = "none"
-headless = true
-enableCORS = true
-enableXsrfProtection = true
 maxUploadSize = 100
-allowRunOnSave = false
-enableStaticServing = false
-baseUrlPath = ""
-cookieSecret = "sky"
-enableWebsocketCompression = false
 
 [logger]
 # 生產環境簡潔日誌
