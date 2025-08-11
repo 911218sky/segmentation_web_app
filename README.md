@@ -21,13 +21,29 @@ conda create -p venv python=3.11
 conda activate ./venv
 ```
 
-### 3. Install Dependencies
+### 3. Download Required Resources
+Download the model files and wheels from the GitHub release:
+
+```bash
+# Download models.tar.gz and wheels.tar.gz from GitHub release
+wget https://github.com/911218sky/segmentation_web_app/releases/download/v2/models.tar.gz
+wget https://github.com/911218sky/segmentation_web_app/releases/download/v2/wheels.tar.gz
+
+tar -xzf models.tar.gz
+tar -xzf wheels.tar.gz
+```
+
+**Alternative**: Manual download
+- Visit [Release v2](https://github.com/911218sky/segmentation_web_app/releases/tag/v2)
+- Download `models.tar.gz` and `wheels.tar.gz`
+- Place the files in the project root directory
+
+### 4. Install Dependencies
 ```bash
 # Install PyTorch with CUDA support (recommended)
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 # Install YOLOv12 requirements
-pip install flash_attn-2.8.2+cu12torch2.7cxx11abiFALSE-cp311-cp311-linux_x86_64.whl
 pip install -r requirements_yolo.txt
 
 # Install application dependencies
@@ -36,11 +52,7 @@ pip install -r requirements.txt
 # Install YOLOv12 in development mode
 cd ./yolov12
 pip install -e .
-```
-
-### 4. Prepare Model File
-```bash
-tar -xzf models.tar.gz
+cd ..
 ```
 
 ## 🚀 Usage Guide
@@ -49,3 +61,8 @@ tar -xzf models.tar.gz
 ```bash
 streamlit run app/main.py
 ```
+
+**Important Notes**:
+- Ensure all installation steps are completed before running the application
+- For GPU acceleration, make sure CUDA-enabled PyTorch is properly installed
+- Model files require several GB of disk space, ensure sufficient storage capacity
