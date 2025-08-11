@@ -5,7 +5,7 @@ import zipfile
 from io import BytesIO
 import numpy as np
 from PIL import Image
-from streamlit_chunked_upload import uploader as chunked_uploader
+# from streamlit_chunked_upload import uploader as chunked_uploader
 from utils.canvas import render_canvas_section
 
 sys.path.append("../yolov12")

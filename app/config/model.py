@@ -24,6 +24,7 @@ def load_model(model_name):
         st.error(f"模型載入失敗: {str(e)}")
         return None, None
 
+@st.cache_resource
 def switch_model(new_model_name):
     """切換模型"""
     if new_model_name != st.session_state.get('current_model_name'):

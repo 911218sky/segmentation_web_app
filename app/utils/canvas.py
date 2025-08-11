@@ -31,44 +31,55 @@ def convert_original_xywh_to_resized(
 
     return (resized_x, resized_y, resized_w, resized_h)
 
+@st.cache_data(ttl=3600, max_entries=5)
+def process_image_for_canvas(image_file):
+    """
+    讀取並依畫布寬高上限對圖片進行高品質重採樣。
+    回傳: resized_img, original_size(tuple), canvas_size(tuple)
+    """
+    img = Image.open(image_file)
+
+    # 設定畫布寬度 800px，等比例計算高度
+    max_canvas_w = 800
+    max_canvas_h = 600
+
+    canvas_w = max_canvas_w
+    canvas_h = int(canvas_w * img.height / img.width)
+
+    if canvas_h > max_canvas_h:           # 若高度超過上限則改依高度縮放
+        canvas_h = max_canvas_h
+        canvas_w = int(canvas_h * img.width / img.height)
+
+    resized_img = img.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+
+    return resized_img, (img.width, img.height), (canvas_w, canvas_h)
+    
 def render_canvas_section(uploaded_file):
     """渲染可繪製畫布區域 - 單張圖片，只能畫一個矩形區域 (x, y, w, h)"""
     if not uploaded_file:
         return None
     
-    # 初始化 canvas key counter
     if 'canvas_key_counter' not in st.session_state:
         st.session_state.canvas_key_counter = 0
     
-    # 需要在 language config 中添加這個 key
     st.subheader(get_text('interactive_selection'))
     
     # 直接使用上傳的單張圖片
-    selected_image = Image.open(uploaded_file)
-    
-    # 調整圖片大小以適應畫布
-    canvas_width = 800
-    canvas_height = int(canvas_width * selected_image.height / selected_image.width)
-    
-    if canvas_height > 600:
-        canvas_height = 600
-        canvas_width = int(canvas_height * selected_image.width / selected_image.height)
-    
-    resized_image = selected_image.resize((canvas_width, canvas_height))
+    resized_img, orig_size, canvas_size = process_image_for_canvas(uploaded_file)
     
     # 簡化控制選項
     st.info(get_text('interactive_selection_help'))
     
-    # 創建可繪製畫布 - 使用動態 key 來支援清除功能
+     # 創建可繪製畫布
     canvas_result = st_canvas(
         fill_color="rgba(255, 165, 0, 0.3)",
         stroke_width=2,
         stroke_color="#00f900",
-        background_color="#eee",
-        background_image=resized_image,
+        background_color="#f0f0f0",
+        background_image=resized_img,
         update_streamlit=True,
-        width=canvas_width,
-        height=canvas_height,
+        width=canvas_size[0],
+        height=canvas_size[1],
         drawing_mode="rect",
         key=f"canvas_{st.session_state.canvas_key_counter}",
         display_toolbar=False,
@@ -84,8 +95,8 @@ def render_canvas_section(uploaded_file):
         
         if rect_objects:
             # 計算縮放比例
-            scale_x = selected_image.width / canvas_width
-            scale_y = selected_image.height / canvas_height
+            scale_x = orig_size[0] / canvas_size[0]
+            scale_y = orig_size[1] / canvas_size[1]
             
             # 只處理第一個矩形
             obj = rect_objects[0]
