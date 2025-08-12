@@ -503,6 +503,9 @@ def render_download_section(results):
     st.metric(get_text('processing_efficiency'), f"{len(successful_results)} {get_text('success_count')}")
 
 def main():
+    # 獲取當前設定
+    current_config = file_storage_manager.get_current_config()
+
     # 初始化語言
     initialize_language()
     
@@ -534,9 +537,6 @@ def main():
         # 參數配置區域
         params = render_parameters_section()
     
-    # 獲取當前設定
-    current_config = file_storage_manager.get_current_config()
-
     # 主要內容區域
     if st.session_state.predictor is None:
         st.error(get_text('model_not_loaded'))
