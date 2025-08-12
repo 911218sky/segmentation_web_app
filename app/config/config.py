@@ -79,6 +79,12 @@ COLOR_MAPPINGS = {
     '黃色': (0, 255, 255),
 }
 
+# 畫布配置
+CANVAS_CONFIG = {
+    "rect_width": 500,
+    "rect_height": 300,
+}
+
 # 預設設定組合
 DEFAULT_CONFIGS = {
     "系統預設": {
