@@ -110,7 +110,6 @@ def render_model_section():
     st.subheader(get_text('model_status'))
     if st.session_state.predictor is not None:
         st.success(f"{get_text('model_loaded')}: {current_model}")
-        
         model_path = get_model_path(current_model)
         st.caption(f"📁 {get_text('model_file')}: {model_path.name}")
     else:
@@ -140,17 +139,26 @@ def render_settings_section():
     )
     
     col1, col2 = st.columns(2)
+    # 套用設定按鈕
     with col1:
         if st.button(get_text('apply_config'), type="primary"):
             if selected_config in available_configs:
-                file_storage_manager.apply_config(available_configs[selected_config])
-                # 如果設定包含不同的模型，也要切換模型
-                config_model = available_configs[selected_config].get('selected_model')
-                if config_model and config_model != current_model:
+                new_config = available_configs[selected_config]
+                # 檢查是否需要切換模型
+                config_model = new_config.get('selected_model')
+                model_changed = config_model and config_model != current_model
+                # 套用設定
+                file_storage_manager.apply_config(new_config)
+                # 只有在模型改變時才切換模型並 rerun
+                if model_changed:
                     switch_model(config_model)
-                st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
-                st.rerun()
+                    st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
+                    st.rerun()
+                else:
+                    # 如果只是參數改變，不需要 rerun
+                    st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
     
+    # 刪除設定按鈕
     with col2:
         can_delete = selected_config not in DEFAULT_CONFIGS
         if st.button(get_text('delete_config'), disabled=not can_delete):
@@ -173,6 +181,7 @@ def render_settings_section():
         help=get_text('config_name_help')
     )
     
+    # 儲存設定按鈕
     if st.button(get_text('save_config')):
         if new_config_name:
             current_config = file_storage_manager.get_current_config()
@@ -547,7 +556,6 @@ def main():
     uploaded_files = render_upload_section()
     
     if uploaded_files:
-        
         # 是否開啟區域限制
         if params['region_limit']:
             selected_regions = render_canvas_section(uploaded_files[0], current_config['rect_width'], current_config['rect_height'])
