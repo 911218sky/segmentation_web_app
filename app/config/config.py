@@ -81,8 +81,13 @@ COLOR_MAPPINGS = {
 
 # 畫布配置
 CANVAS_CONFIG = {
+    # 畫布預設框框大小
     "rect_width": 500,
     "rect_height": 300,
+    
+    # 畫布大小上限
+    "max_canvas_w": 800,
+    "max_canvas_h": 600,
 }
 
 # 預設設定組合
@@ -99,6 +104,8 @@ DEFAULT_CONFIGS = {
         "line_alpha": VISUALIZATION_CONFIG["line_alpha"],
         "display_labels": VISUALIZATION_CONFIG["display_labels"],
         "region_limit": VISUALIZATION_CONFIG["region_limit"],
+        "rect_width": CANVAS_CONFIG["rect_width"],
+        "rect_height": CANVAS_CONFIG["rect_height"],
         "line_color_option": "綠色",
     }
 }

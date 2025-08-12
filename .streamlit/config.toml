@@ -8,7 +8,6 @@ maxUploadSize = 100
 [logger]
 # 生產環境簡潔日誌
 level = "info"
-messageFormat = "%(asctime)s [%(levelname)s] %(message)s"
 
 [browser]
 # 生產環境瀏覽器配置

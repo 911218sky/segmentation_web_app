@@ -51,8 +51,6 @@ def initialize_app_state():
         st.session_state.predictor = None
     if 'processed_results' not in st.session_state:
         st.session_state.processed_results = []
-    if 'current_model_name' not in st.session_state:
-        st.session_state.current_model_name = None
     if 'file_manager_initialized' not in st.session_state:
         file_storage_manager.initialize_session_state()
         st.session_state.file_manager_initialized = True
@@ -84,6 +82,9 @@ def render_model_section():
     """渲染模型選擇區域"""
     st.subheader(get_text('model_selection'))
     
+    current_config = file_storage_manager.get_current_config()
+    current_model = current_config['selected_model']
+    
     selected_model = st.selectbox(
         get_text('select_model'),
         options=list(AVAILABLE_MODELS.keys()),
@@ -93,8 +94,8 @@ def render_model_section():
     )
     
     # 顯示當前模型資訊
-    if st.session_state.current_model_name:
-        st.info(f"{get_text('current_model')}: {st.session_state.current_model_name}")
+    if current_config:
+        st.info(f"{get_text('current_model')}: {current_model}")
     
     # 模型切換按鈕
     if st.button(get_text('switch_model'), type="secondary"):
@@ -102,15 +103,15 @@ def render_model_section():
 
     # 自動載入預設模型（如果還沒載入）
     if st.session_state.predictor is None:
-        current_model = st.session_state.get('selected_model', DEFAULT_MODEL)
+        current_model = current_config['selected_model']
         switch_model(current_model)
 
     # 模型狀態顯示
     st.subheader(get_text('model_status'))
     if st.session_state.predictor is not None:
-        st.success(f"{get_text('model_loaded')}: {st.session_state.current_model_name}")
+        st.success(f"{get_text('model_loaded')}: {current_model}")
         
-        model_path = get_model_path(st.session_state.current_model_name)
+        model_path = get_model_path(current_model)
         st.caption(f"📁 {get_text('model_file')}: {model_path.name}")
     else:
         st.error(get_text('model_failed'))
@@ -129,6 +130,8 @@ def render_settings_section():
     # 載入所有可用設定
     available_configs = file_storage_manager.load_saved_configs()
     config_names = list(available_configs.keys())
+    current_config = file_storage_manager.get_current_config()
+    current_model = current_config['selected_model']
     
     selected_config = st.selectbox(
         get_text('select_config'),
@@ -143,7 +146,7 @@ def render_settings_section():
                 file_storage_manager.apply_config(available_configs[selected_config])
                 # 如果設定包含不同的模型，也要切換模型
                 config_model = available_configs[selected_config].get('selected_model')
-                if config_model and config_model != st.session_state.current_model_name:
+                if config_model and config_model != current_model:
                     switch_model(config_model)
                 st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
                 st.rerun()
@@ -309,7 +312,7 @@ def render_parameters_section():
         'line_alpha': line_alpha,
         'display_labels': display_labels,
         'line_color': line_color,
-        'region_limit': region_limit
+        'region_limit': region_limit,
     }
 
 def render_upload_section():
@@ -530,6 +533,9 @@ def main():
 
         # 參數配置區域
         params = render_parameters_section()
+    
+    # 獲取當前設定
+    current_config = file_storage_manager.get_current_config()
 
     # 主要內容區域
     if st.session_state.predictor is None:
@@ -544,8 +550,7 @@ def main():
         
         # 是否開啟區域限制
         if params['region_limit']:
-            # 繪製圖片區域 拿第一張圖片
-            selected_regions = render_canvas_section(uploaded_files[0])
+            selected_regions = render_canvas_section(uploaded_files[0], current_config['rect_width'], current_config['rect_height'])
         else:
             selected_regions = None
         

@@ -144,17 +144,5 @@ class FileStorageManager:
     def get_current_config():
         """獲取當前的配置參數"""
         default_config = DEFAULT_CONFIGS["系統預設"]
-        return {
-            "selected_model": st.session_state.get('selected_model', default_config['selected_model']),
-            "pixel_size_mm": st.session_state.get('pixel_size_mm', default_config['pixel_size_mm']),
-            "confidence_threshold": st.session_state.get('confidence_threshold', default_config['confidence_threshold']),
-            "sample_interval": st.session_state.get('sample_interval', default_config['sample_interval']),
-            "gradient_search_top": st.session_state.get('gradient_search_top', default_config['gradient_search_top']),
-            "gradient_search_bottom": st.session_state.get('gradient_search_bottom', default_config['gradient_search_bottom']),
-            "keep_ratio": st.session_state.get('keep_ratio', default_config['keep_ratio']),
-            "line_thickness": st.session_state.get('line_thickness', default_config['line_thickness']),
-            "line_alpha": st.session_state.get('line_alpha', default_config['line_alpha']),
-            "display_labels": st.session_state.get('display_labels', default_config['display_labels']),
-            "region_limit": st.session_state.get('region_limit', default_config['region_limit']),
-            "line_color_option": st.session_state.get('line_color_option', default_config['line_color_option']),
-        }
+        session_dict = dict(st.session_state)
+        return {key: session_dict.get(key, default) for key, default in default_config.items()}

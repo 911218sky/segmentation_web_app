@@ -3,6 +3,7 @@ from typing import Tuple
 from PIL import Image
 from streamlit_drawable_canvas import st_canvas
 from config.language import get_text
+from config import CANVAS_CONFIG
 
 def convert_original_xywh_to_resized(
     original_xywh: Tuple[int, int, int, int],
@@ -39,14 +40,14 @@ def process_image_for_canvas(image_file):
     """
     img = Image.open(image_file)
 
-    # 設定畫布寬度 800px，等比例計算高度
-    max_canvas_w = 800
-    max_canvas_h = 600
+    max_canvas_w = CANVAS_CONFIG['max_canvas_w']
+    max_canvas_h = CANVAS_CONFIG['max_canvas_h']
 
     canvas_w = max_canvas_w
     canvas_h = int(canvas_w * img.height / img.width)
 
-    if canvas_h > max_canvas_h:           # 若高度超過上限則改依高度縮放
+    # 若高度超過上限則改依高度縮放
+    if canvas_h > max_canvas_h:
         canvas_h = max_canvas_h
         canvas_w = int(canvas_h * img.width / img.height)
 
@@ -54,23 +55,74 @@ def process_image_for_canvas(image_file):
 
     return resized_img, (img.width, img.height), (canvas_w, canvas_h)
     
-def render_canvas_section(uploaded_file):
-    """渲染可繪製畫布區域 - 單張圖片，只能畫一個矩形區域 (x, y, w, h)"""
+def render_canvas_section(uploaded_file, rect_width = CANVAS_CONFIG['rect_width'], rect_height = CANVAS_CONFIG['rect_height']):
+    """渲染可繪製畫布區域 - 單張圖片，固定矩形尺寸，只能移動位置"""
     if not uploaded_file:
         return None
     
-    if 'canvas_key_counter' not in st.session_state:
-        st.session_state.canvas_key_counter = 0
-    
     st.subheader(get_text('interactive_selection'))
-    
-    # 直接使用上傳的單張圖片
+
+    # 處理圖片
     resized_img, orig_size, canvas_size = process_image_for_canvas(uploaded_file)
     
-    # 簡化控制選項
-    st.info(get_text('interactive_selection_help'))
+    st.markdown("**調整選取區域尺寸**")
+    col1, col2 = st.columns(2)
+    with col1:
+        fixed_width = st.number_input(
+            "寬度 (px)", 
+            min_value=10, 
+            max_value=orig_size[0], 
+            step=10,
+            value=rect_width,
+            key="rect_width"
+        )
     
-     # 創建可繪製畫布
+    with col2:
+        fixed_height = st.number_input(
+            "高度 (px)", 
+            min_value=10, 
+            max_value=orig_size[1], 
+            step=10,
+            value=rect_height,
+            key="rect_height"
+        )
+        
+    # 計算縮放比例和畫布尺寸
+    scale_x = canvas_size[0] / orig_size[0]
+    scale_y = canvas_size[1] / orig_size[1]
+    canvas_rect_width = int(fixed_width * scale_x)
+    canvas_rect_height = int(fixed_height * scale_y)
+    
+    # 設定初始位置（只在首次或重置時）
+    default_x = (canvas_size[0] - canvas_rect_width) // 2
+    default_y = (canvas_size[1] - canvas_rect_height) // 2
+    
+    # 準備初始繪圖物件
+    initial_drawing = {
+        "objects": [
+            {
+                "type": "rect",
+                "originX": "left",
+                "originY": "top",
+                "left": default_x,
+                "top": default_y,
+                "width": canvas_rect_width,
+                "height": canvas_rect_height,
+                "fill": "rgba(255, 165, 0, 0.3)",
+                "stroke": "#00f900",
+                "strokeWidth": 2,
+                "selectable": True, # 可以被選取/點擊
+                "evented": True, # 可以觸發事件（如滑鼠事件）
+                "lockScalingX": True, # 鎖定水平縮放 - 防止水平縮放矩形
+                "lockScalingY": True, # 鎖定垂直縮放 - 防止垂直縮放矩形 
+                "lockRotation": True, # 鎖定旋轉 - 防止旋轉矩形
+                "hasControls": False, # 隱藏控制點 - 不顯示四角的縮放控制點
+                "hasBorders": True,  # 顯示選取邊框 - 選取時會顯示邊框
+            }
+        ]
+    }
+    
+    # 畫布元件
     canvas_result = st_canvas(
         fill_color="rgba(255, 165, 0, 0.3)",
         stroke_width=2,
@@ -80,46 +132,33 @@ def render_canvas_section(uploaded_file):
         update_streamlit=True,
         width=canvas_size[0],
         height=canvas_size[1],
-        drawing_mode="rect",
-        key=f"canvas_{st.session_state.canvas_key_counter}",
-        display_toolbar=False,
+        drawing_mode="transform", # 設定為變換模式，只能移動、選取現有物件，不能繪製新物件
+        initial_drawing=initial_drawing, # 預載初始繪圖內容
+        display_toolbar=False, # 隱藏工具列
+        key=f"canvas_{fixed_width}_{fixed_height}",
     )
     
-    # 處理繪製結果 - 只處理矩形，且只取第一個
+    # 處理畫布結果
     region = None
+    
     if canvas_result.json_data is not None:
         objects = canvas_result.json_data.get("objects", [])
-        
-        # 只取第一個矩形物件
-        rect_objects = [obj for obj in objects if obj["type"] == "rect"]
-        
-        if rect_objects:
-            # 計算縮放比例
-            scale_x = orig_size[0] / canvas_size[0]
-            scale_y = orig_size[1] / canvas_size[1]
+        if objects:
+            obj = objects[0]
+            new_x = int(obj["left"])
+            new_y = int(obj["top"])
             
-            # 只處理第一個矩形
-            obj = rect_objects[0]
-            x = int(obj["left"] * scale_x)
-            y = int(obj["top"] * scale_y)
-            w = int(obj["width"] * scale_x)
-            h = int(obj["height"] * scale_y)
+            # 轉換為原始圖片座標
+            orig_scale_x = orig_size[0] / canvas_size[0]
+            orig_scale_y = orig_size[1] / canvas_size[1]
+            
+            x = int(new_x * orig_scale_x)
+            y = int(new_y * orig_scale_y)
+            w = fixed_width
+            h = fixed_height
             
             region = (x, y, w, h)
-            
-            # 如果有多個矩形，提醒用戶只會使用第一個
-            if len(rect_objects) > 1:
-                st.warning(get_text('multiple_regions_warning'))
     
-    # 顯示已選擇的區域資訊
-    if region:
-        # 清除區域按鈕
-        if st.button(get_text('clear_region'), key="clear_region"):
-            st.session_state.canvas_key_counter += 1
-            st.rerun()
-        # 顯示成功訊息
-        st.success(get_text('region_selected'))
-    else:
-        st.info(get_text('no_region_selected'))
+    st.info(get_text('interactive_selection_help') + f" (目前選擇區域: {region})")
     
     return region

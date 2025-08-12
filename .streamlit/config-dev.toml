@@ -12,9 +12,7 @@ allowRunOnSave = true
 enableStaticServing = false
 
 [logger]
-# 開發環境詳細日誌
-level = "debug"
-messageFormat = "%(asctime)s %(message)s"
+level = "info"
 
 [browser]
 # 開發環境瀏覽器配置
