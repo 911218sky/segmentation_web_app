@@ -13,6 +13,7 @@ from .config import (
     TEMP_DIR,
     OUTPUT_DIR,
     MODELS_DIR,
+    CANVAS_CONFIG,
 )
 
 from .config_manager import (
@@ -45,6 +46,7 @@ __all__ = [
     "TEMP_DIR",
     "OUTPUT_DIR",
     "MODELS_DIR",
+    "CANVAS_CONFIG",
     
     # from config_manager
     "FileStorageManager",
