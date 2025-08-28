@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  vessel:
+    build:
+      context: .
+    image: vessel-measure:latest
+    container_name: vessel_measure
+    ports:
+      # 外面:裡面
+      - "8501:8501"
+    volumes:
+      - ./.streamlit:/app/.streamlit
+      - ./user_configs:/app/user_configs
+      - ./temp:/app/temp
+      - ./models:/app/models
+      - ./scripts:/app/scripts
+      # 若你想在容器內以唯讀方式使用本地程式碼（開發時可改成 rw）
+      - ./app:/app/app:ro
+      - ./yolov12:/app/yolov12:ro
+    restart: unless-stopped
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
