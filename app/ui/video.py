@@ -3,6 +3,7 @@ import os
 import math
 import cv2
 import time
+import numpy as np
 
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
@@ -35,6 +36,15 @@ def upload_video(cache: bool = True) -> Optional[UploadedFile]:
         accept_multiple_files=False,
     )
     return st.session_state.video_uploader
+
+@st.cache_data(show_spinner=False)
+def get_first_frame(video_path: str) -> Optional[np.ndarray]:
+    cap = cv2.VideoCapture(video_path)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None:
+        return None
+    return frame
   
 def handle_video_processing(
     upload: UploadedFile,
@@ -60,10 +70,8 @@ def handle_video_processing(
     # 選區（第一幀）
     region = None
     if params.get('region_limit') and video_path.exists():
-        cap = cv2.VideoCapture(str(video_path))
-        ok, frame = cap.read();
-        cap.release()
-        if ok:
+        frame = get_first_frame(str(video_path))
+        if frame is not None:
             region = canvas(frame)
                 
     col1, col2 = st.columns(2)

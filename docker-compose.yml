@@ -4,10 +4,12 @@ services:
   vessel:
     build:
       context: .
+      args:
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
     image: vessel-measure:latest
     container_name: vessel_measure
     ports:
-      # 外面:裡面
       - "8501:8501"
     volumes:
       - ./.streamlit:/app/.streamlit
@@ -15,11 +17,12 @@ services:
       - ./temp:/app/temp
       - ./models:/app/models
       - ./scripts:/app/scripts
-      # 若你想在容器內以唯讀方式使用本地程式碼（開發時可改成 rw）
+      # 如果你在 host 上開發並希望容器內可以讀程式碼
       - ./app:/app/app:ro
       - ./yolov12:/app/yolov12:ro
     restart: unless-stopped
 
+    # 如果使用 GPU，請確保主機安裝 NVIDIA Container Toolkit
     deploy:
       resources:
         reservations:

@@ -89,52 +89,58 @@ def canvas(
     }
 
     # 畫布元件
-    canvas_result = st_canvas(
-        fill_color="rgba(255, 165, 0, 0.3)",
-        stroke_width=2,
-        stroke_color="#00f900",
-        background_color="#f0f0f0",
-        background_image=resized_img,
-        update_streamlit=True,
-        width=canvas_size[0],
-        height=canvas_size[1],
-        drawing_mode="transform",  # 設定為變換模式，只能移動、選取現有物件
-        initial_drawing=initial_drawing,
-        display_toolbar=False,
-        key=f"canvas_{canvas_size[0]}_{canvas_size[1]}_{fixed_width}_{fixed_height}",
-    )
+    with st.form("region_form", clear_on_submit=True):
+        canvas_result = st_canvas(
+            fill_color="rgba(255, 165, 0, 0.3)",
+            stroke_width=2,
+            stroke_color="#00f900",
+            background_color="#f0f0f0",
+            background_image=resized_img,
+            update_streamlit=True,
+            width=canvas_size[0],
+            height=canvas_size[1],
+            drawing_mode="transform",  # 設定為變換模式，只能移動、選取現有物件
+            initial_drawing=initial_drawing,
+            display_toolbar=False,
+            key=f"canvas_{canvas_size[0]}_{canvas_size[1]}_{fixed_width}_{fixed_height}",
+        )
 
-    region: Optional[XYWH] = None
+        region: Optional[XYWH] = None
 
-    # 處理畫布結果
-    json_data = getattr(canvas_result, "json_data", None)
-    if json_data:
-        objects = json_data.get("objects", [])
-        if objects:
-            obj = objects[0]
-            # left/top may be float; convert safely
-            new_x = int(round(float(obj.get("left", 0.0))))
-            new_y = int(round(float(obj.get("top", 0.0))))
+        # 處理畫布結果
+        json_data = getattr(canvas_result, "json_data", None)
+        if json_data:
+            objects = json_data.get("objects", [])
+            if objects:
+                obj = objects[0]
+                # left/top may be float; convert safely
+                new_x = int(round(float(obj.get("left", 0.0))))
+                new_y = int(round(float(obj.get("top", 0.0))))
 
-            # 轉換為原始圖片座標
-            orig_scale_x = float(orig_size[0]) / float(canvas_size[0])
-            orig_scale_y = float(orig_size[1]) / float(canvas_size[1])
+                # 轉換為原始圖片座標
+                orig_scale_x = float(orig_size[0]) / float(canvas_size[0])
+                orig_scale_y = float(orig_size[1]) / float(canvas_size[1])
 
-            x = int(round(new_x * orig_scale_x))
-            y = int(round(new_y * orig_scale_y))
-            w = int(round(fixed_width))
-            h = int(round(fixed_height))
+                x = int(round(new_x * orig_scale_x))
+                y = int(round(new_y * orig_scale_y))
+                w = int(round(fixed_width))
+                h = int(round(fixed_height))
 
-            # 保證不超出原始邊界
-            x = max(0, min(x, orig_size[0]))
-            y = max(0, min(y, orig_size[1]))
-            if x + w > orig_size[0]:
-                w = max(0, orig_size[0] - x)
-            if y + h > orig_size[1]:
-                h = max(0, orig_size[1] - y)
+                # 保證不超出原始邊界
+                x = max(0, min(x, orig_size[0]))
+                y = max(0, min(y, orig_size[1]))
+                if x + w > orig_size[0]:
+                    w = max(0, orig_size[0] - x)
+                if y + h > orig_size[1]:
+                    h = max(0, orig_size[1] - y)
 
-            region = (x, y, w, h)
+                region = (x, y, w, h)
 
-    st.info(get_text("interactive_selection_help") + f" (目前選擇區域: {region})")
+        st.info(get_text("interactive_selection_help") + f" (目前選擇區域: {region})")
+
+        submitted = st.form_submit_button("套用選區")
+        if submitted:
+            st.session_state.region = region
+            st.success("選區已儲存")
 
     return region

@@ -1,6 +1,7 @@
 import streamlit as st
-from typing import List, Tuple, Optional
 import re
+import pandas as pd
+from typing import List, Tuple, Optional
 
 def _parse_time_to_seconds(t: str) -> float:
     """
@@ -91,26 +92,17 @@ def _merge_intervals(intervals: List[Tuple[float, float]]) -> List[Tuple[float, 
 
     return [(float(a), float(b)) for a, b in merged]
 
-
 # 渲染時間區間
 def video_intervals(
     session_key: str = "video_intervals",
     default: Optional[List[Tuple[float, float]]] = None
 ) -> List[Tuple[float, float]]:
     """
-    在 Streamlit 中呈現時間區間編輯器，並回傳最終的區間列表。
-
-    功能：
-      - 輸入開始/結束時間（支援多種格式）
-      - 新增、刪除單筆區間
-      - 合併重疊區間 / 清除 / 匯出為可複製字串
-
-    參數:
-      session_key: 存放在 st.session_state 的 key（可同頁面多組使用）
-      default: 預設區間列表
-
-    回傳:
-      List[ (start_s, end_s), ... ]（數值為 float 秒）
+    改良版：在 Streamlit 中呈現時間區間編輯器，降低每次互動造成的卡頓。
+    - 使用單一 DataFrame 顯示區間（避免為每筆建立大量 widget）
+    - 使用 multiselect + 單一刪除按鈕來刪除多筆
+    - 新增表單使用 clear_on_submit=True（提交後清空欄位）
+    - 支援合併 / 清除 / 匯出簡單文字
     """
     if default is None:
         default = []
@@ -120,13 +112,11 @@ def video_intervals(
         st.session_state[session_key] = list(default)
 
     st.markdown("### ⏱️ 設定影片處理區間（秒）")
-    st.markdown(
-        "輸入範例：`75`、`75.5`、`01:15` 或 `0:01:15`"
-    )
+    st.markdown("輸入範例：`75`、`75.5`、`01:15` 或 `0:01:15`")
 
-    # 新增區間表單
-    with st.form(key=f"{session_key}_add_form", clear_on_submit=False):
-        c1, c2, c3 = st.columns([1.4, 1.4, 0.6])
+    # 新增區間表單（提交後清空輸入）
+    with st.form(key=f"{session_key}_add_form", clear_on_submit=True):
+        c1, c2, c3 = st.columns([1.6, 1.6, 0.6])
         with c1:
             start_raw = st.text_input("開始 (秒 或 hh:mm:ss)",
                                       placeholder="例如 75 或 00:01:15",
@@ -137,7 +127,6 @@ def video_intervals(
                                     key=f"{session_key}_end")
         with c3:
             add_btn = st.form_submit_button("➕ 新增區間")
-
     if add_btn:
         try:
             s = _parse_time_to_seconds(start_raw)
@@ -155,44 +144,55 @@ def video_intervals(
 
     intervals = st.session_state[session_key]
 
+    # 若無區間直接顯示提示
     if not intervals:
         st.info("目前沒有任何區間。請在上方輸入並按「➕ 新增區間」。")
     else:
-        for i, (s, e) in enumerate(list(intervals)):
-            # 三欄：編號 / 主要文字 (時間 + 長度) / 操作按鈕
-            col_idx, col_main, col_actions = st.columns([0.12, 1.8, 0.5])
+        # 建 DataFrame（只建一次）
+        df = pd.DataFrame(intervals, columns=["start_s", "end_s"])
+        df["duration_s"] = df["end_s"] - df["start_s"]
+        df["start_hms"] = df["start_s"].apply(_seconds_to_hms)
+        df["end_hms"] = df["end_s"].apply(_seconds_to_hms)
+        df["label"] = df.apply(lambda r: f"{_seconds_to_hms(r.start_s)} → {_seconds_to_hms(r.end_s)} ({r.duration_s:.2f}s)", axis=1)
 
-            # 左側：醒目的編號
-            col_idx.markdown(f"**{i+1}**")
+        # 若筆數很少，顯示完整 table；若很多則分頁顯示（每頁 25）
+        MAX_PER_PAGE = 25
+        n = len(df)
+        if n <= MAX_PER_PAGE:
+            st.dataframe(df[["label"]].rename(columns={"label": "區間 (點選以選取)"}), use_container_width=True)
+            display_df = df
+            start_idx = 0
+        else:
+            # 分頁控制
+            pages = (n + MAX_PER_PAGE - 1) // MAX_PER_PAGE
+            page = st.number_input("頁面", min_value=1, max_value=pages, value=1, step=1, key=f"{session_key}_page")
+            start_idx = (page - 1) * MAX_PER_PAGE
+            display_df = df.iloc[start_idx:start_idx + MAX_PER_PAGE]
+            st.dataframe(display_df[["label"]].rename(columns={"label": f"區間 (第 {page}/{pages} 頁)"}), use_container_width=True)
 
-            # 中間：開始→結束（大字）與次要行（顯示秒數與 mm:ss）
-            duration_s = e - s
-            col_main.markdown(
-                f"**{_seconds_to_hms(s)} → {_seconds_to_hms(e)}**  \n"  # 主行（粗體）
-                f"共 {duration_s:.2f} 秒"  # 次行（純文字）
-            )
+        # 用單一 multiselect 來選擇要刪除的項目（減少 per-item buttons）
+        options = {f"{start_idx + idx + 1}. {row.label}": start_idx + idx for idx, row in enumerate(display_df.itertuples())}
+        sel = st.multiselect("選取要刪除的區間（可多選）", options=list(options.keys()), key=f"{session_key}_multisel")
+        if st.button("🗑️ 刪除所選", key=f"{session_key}_del_btn"):
+            if not sel:
+                st.warning("請先選擇要刪除的區間。")
+            else:
+                # 計算要保留的 intervals
+                del_indices = set(options[s] for s in sel)
+                new_list = [iv for idx, iv in enumerate(intervals) if idx not in del_indices]
+                st.session_state[session_key] = new_list
+                st.success(f"已刪除 {len(del_indices)} 筆。")
 
-            # 右側：刪除按鈕（只顯示圖示，並提供說明）
-            # 使用單一圖示按鈕讓列表看起來更簡潔
-            if col_actions.button("🗑️", key=f"{session_key}_del_{i}", help="刪除此區間"):
-                st.session_state[session_key].pop(i)
-                st.rerun()
-
-            # 每筆之後加一條分隔線 (最後一筆不加)
-            if i < len(intervals) - 1:
-              st.divider()
-
-    # 批次操作區塊
-    st.write("---")
-    cA, cB = st.columns([1, 1])
-    with cA:
-        if cA.button("🔀 合併重疊區間"):
-            st.session_state[session_key] = _merge_intervals(st.session_state[session_key])
-            st.success("已合併重疊 / 相接的區間。")
-    with cB:
-        if cB.button("🧹 清除全部區間"):
-          st.session_state[session_key] = []
-          st.success("已清除全部。")
+        # 匯出 & 複製用文字顯示（方便一次複製）
+        st.write("---")
+        cA, cB = st.columns([1, 1])
+        with cA:
+            if st.button("🔀 合併重疊區間", key=f"{session_key}_merge_btn"):
+                st.session_state[session_key] = _merge_intervals(st.session_state[session_key])
+                st.success("已合併重疊 / 相接的區間。")
+        with cB:
+            if st.button("🧹 清除全部區間", key=f"{session_key}_clear_btn"):
+                st.session_state[session_key] = []
 
     # 最終回傳
     final_list: List[Tuple[float, float]] = [(float(s), float(e)) for s, e in st.session_state[session_key]]
