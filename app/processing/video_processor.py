@@ -287,9 +287,9 @@ class VideoIntervalProcessor:
                 max_at_frame = frame_means[max_pos][0]
                 max_at_s = float(max_at_frame / src_fps)
             else:
-                mean_of_means = 0.0
-                max_of_means = 0.0
-                max_at_s = None
+                mean_of_means = -1
+                max_of_means = -1
+                max_at_s = -1
 
             stats[f"interval_{k:02d}"] = IntervalStat(
                 start_s=start_s,
