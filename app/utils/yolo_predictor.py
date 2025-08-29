@@ -71,7 +71,7 @@ class YOLOPredictor:
             (邊界框, 信心度, 分割遮罩) 的元組
         """
         if len(result.boxes) == 0:
-            print("沒有檢測到任何物體")
+            # print("沒有檢測到任何物體")
             return None, None, None
         
         # 提取邊界框和信心度分數

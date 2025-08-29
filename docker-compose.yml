@@ -10,7 +10,7 @@ services:
     image: vessel-measure:latest
     container_name: vessel_measure
     ports:
-      - "8501:8501"
+      - "3015:8501"
     volumes:
       - ./.streamlit:/app/.streamlit
       - ./user_configs:/app/user_configs

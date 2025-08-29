@@ -6,6 +6,7 @@ import time
 import numpy as np
 
 import streamlit as st
+from streamlit_chunked_upload import uploader as chunk_uploader
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from config import (
@@ -28,13 +29,25 @@ from ui import (
 
 def upload_video(cache: bool = True) -> Optional[UploadedFile]:
     st.subheader("🎞️ 上傳影片")
-    if cache and st.session_state.get("video_uploader"):
-        return st.session_state.video_uploader
     
-    st.session_state.video_uploader = st.file_uploader(
-        "選擇影片 (mp4/mov/avi/mkv)", type=['mp4','mov','avi','mkv'],
-        accept_multiple_files=False,
-    )
+    # st.session_state.video_uploader = st.file_uploader(
+    #     "選擇影片 (mp4/mov/avi/mkv)", type=['mp4','mov','avi','mkv'],
+    #     accept_multiple_files=False,
+    # )
+    
+    if not cache or not st.session_state.get("video_uploader"):
+        st.session_state.video_uploader = chunk_uploader(
+            label="選擇影片 (mp4/mov/avi/mkv)",
+            chunk_size=8,
+            type=['mp4','mov','avi','mkv'],
+            uploader_msg="選擇影片 (mp4/mov/avi/mkv) 建議不超過 1GB",
+        )
+    
+    show_clear_button = st.button("🗑️ 清空影片")
+    if show_clear_button:
+        st.session_state.video_uploader = None
+        st.rerun()
+    
     return st.session_state.video_uploader
 
 @st.cache_data(show_spinner=False)
