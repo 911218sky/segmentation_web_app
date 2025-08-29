@@ -1,12 +1,15 @@
 from typing import Optional
+
+import numpy as np
 import streamlit as st
 from streamlit_drawable_canvas import st_canvas
+from PIL import Image as PILImage
 
+from config import CANVAS_CONFIG
 from config.language import get_text
 from utils.canvas import process_image_for_canvas, XYWH, FileLike
-from config import CANVAS_CONFIG
 
-def render_canvas_section(
+def canvas(
     uploaded_file: FileLike,
     rect_width: int = CANVAS_CONFIG["rect_width"],
     rect_height: int = CANVAS_CONFIG["rect_height"],
@@ -19,10 +22,11 @@ def render_canvas_section(
     Returns:
         region in ORIGINAL image coordinates (x, y, w, h) or None if no selection.
     """
-    if not uploaded_file:
-        return None
-
     st.subheader(get_text("interactive_selection"))
+    
+    # 如果上傳的是 numpy 陣列，則轉換為 PIL 圖片
+    if isinstance(uploaded_file, np.ndarray):
+        uploaded_file = PILImage.fromarray(uploaded_file)
 
     # 處理圖片（resized 輸出用於 canvas 背景）
     resized_img, orig_size, canvas_size = process_image_for_canvas(uploaded_file)

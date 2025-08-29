@@ -1,15 +1,17 @@
+import os
 import sys
 from pathlib import Path
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Union, List, Any
 import numpy as np
+from PIL import Image
+import cv2
 
 # 添加父目錄到路徑
-current_dir = Path(__file__).resolve().parent
+current_dir = Path(__file__).resolve().parent.parent
 parent_dir = current_dir.parent
 sys.path.insert(0, str(parent_dir))
 
 from yolov12.ultralytics import YOLO
-
 
 class YOLOPredictor:
     """YOLO預測器類別"""
@@ -23,23 +25,40 @@ class YOLOPredictor:
         """
         self.model = YOLO(str(weights_path), task="segment")
     
-    def predict(self, source_dir: Path, **kwargs) -> Any:
-        """
-        執行預測
+    def predict(
+      self,
+      source: Union[Path, str, np.ndarray, list],
+      task: str = "segment",
+      **kwargs
+    ) -> List[Any]:
+        def to_model_input(x):
+            # 保留 path/str 原樣（模型會讀取檔案路徑）
+            if isinstance(x, (Path, os.PathLike, str)):
+                return str(x)
+            # np.ndarray 直接回傳
+            if isinstance(x, np.ndarray):
+                return x
+            # PIL Image -> 轉成 BGR np.ndarray（若你的 model 需要 BGR）
+            if isinstance(x, Image.Image):
+                return cv2.cvtColor(np.array(x), cv2.COLOR_RGB2BGR)
+            raise TypeError(f"Unsupported list element type: {type(x)}")
+
+        if isinstance(source, list):
+            src_arg = [to_model_input(x) for x in source]
+        elif isinstance(source, (Path, os.PathLike)):
+            src_arg = str(source)
+        elif isinstance(source, str):
+            src_arg = source
+        elif isinstance(source, np.ndarray):
+            src_arg = source
+        else:
+            raise TypeError(f"Unsupported type for source: {type(source)}. Expect Path, str, np.ndarray, or list[...]")
+
+        res = self.model.predict(task=task, source=src_arg, **kwargs)
+        if isinstance(res, (list, tuple)):
+            return list(res)
+        return [res]
         
-        Args:
-            source_dir: 圖片源目錄
-            **kwargs: YOLO預測參數
-        
-        Returns:
-            預測結果
-        """
-        return self.model.predict(
-            task="segment",
-            source=str(source_dir),
-            **kwargs
-        )
-    
     @staticmethod
     def extract_max_confidence_segment(result) -> Tuple[Optional[np.ndarray], Optional[float], Optional[np.ndarray]]:
         """

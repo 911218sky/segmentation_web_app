@@ -93,7 +93,7 @@ def _merge_intervals(intervals: List[Tuple[float, float]]) -> List[Tuple[float, 
 
 
 # 渲染時間區間
-def render_intervals(
+def video_intervals(
     session_key: str = "video_intervals",
     default: Optional[List[Tuple[float, float]]] = None
 ) -> List[Tuple[float, float]]:

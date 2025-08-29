@@ -3,7 +3,7 @@
 port = 3012
 address = "0.0.0.0"
 runOnSave = false
-maxUploadSize = 100
+maxUploadSize = 2000
 
 [logger]
 # 生產環境簡潔日誌

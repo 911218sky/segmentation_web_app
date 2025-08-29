@@ -7,13 +7,13 @@ import cv2
 import numpy as np
 
 from config import * 
-from yolo_predictor import YOLOPredictor
-from processing.line_extractor import LineExtractor
-from utils.image_utils import batch_resize_uniform
+from utils.line_extractor import LineExtractor
 from utils.canvas import convert_original_xywh_to_resized
 from utils.ffmpeg_pipe import FFmpegPipe
+from utils.image import batch_uniform_resize
 from utils.stability_filter import SlidingStabilityFilter
-from visualizer import Visualizer
+from utils.visualizer import Visualizer
+from utils.yolo_predictor import YOLOPredictor
 
 @dataclass
 class IntervalStat:
@@ -230,12 +230,14 @@ class VideoIntervalProcessor:
                     return
 
                 # 等比例 letterbox 到 TARGET_SIZE（在記憶體中）
-                resized_frames, _ = batch_resize_uniform(batch_frames, target_size=TARGET_SIZE)
+                resized_results = batch_uniform_resize(batch_frames, target_size=TARGET_SIZE)
+                resized_frames = [result.resized_image for result in resized_results]
 
-                results = self.predictor.predict_frames(resized_frames, **self.yolo_config)
+                # 批次推理
+                predict_results = self.predictor.predict(resized_frames, **self.yolo_config)
 
                 # 逐幀後處理與寫出（frame 是 resize 後的）
-                for frm_resized, res, idx in zip(resized_frames, results, batch_indices):
+                for frm_resized, res, idx in zip(resized_frames, predict_results, batch_indices):
                     mean_mm, frame_out = self._frame_postprocess(frm_resized, res, region_resized)
                     if mean_mm is not None:
                         frame_means.append((idx, mean_mm))

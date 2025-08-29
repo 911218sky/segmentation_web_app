@@ -1,5 +1,5 @@
 import streamlit as st
-from yolo_predictor import YOLOPredictor
+from utils.yolo_predictor import YOLOPredictor
 
 from .config import AVAILABLE_MODELS, DEFAULT_MODEL, MODELS_DIR
 

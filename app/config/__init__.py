@@ -4,9 +4,10 @@ from .config import (
     BATCH_SIZE,
     TARGET_SIZE,
     YOLO_CONFIG,
+    TARGET_FPS,
     PROCESSING_CONFIG,
     VISUALIZATION_CONFIG,
-    LINE_EXTRACTION_CONFIG,
+    LINE_CONFIG,
     DEFAULT_CONFIGS,
     STORAGE_KEY,
     BASE_DIR,
@@ -30,6 +31,13 @@ from .language import (
     get_text
 )
 
+from .page import (
+    PAGES,
+    switch_page,
+)
+
+file_storage_manager = FileStorageManager()
+
 __all__ = [
     # from config
     "AVAILABLE_MODELS",
@@ -37,9 +45,10 @@ __all__ = [
     "BATCH_SIZE",
     "TARGET_SIZE",
     "YOLO_CONFIG",
+    "TARGET_FPS",
     "PROCESSING_CONFIG",
     "VISUALIZATION_CONFIG",
-    "LINE_EXTRACTION_CONFIG",
+    "LINE_CONFIG",
     "DEFAULT_CONFIGS",
     "STORAGE_KEY",
     "BASE_DIR",
@@ -48,8 +57,12 @@ __all__ = [
     "MODELS_DIR",
     "CANVAS_CONFIG",
     
+    # from page
+    "PAGES",
+    "switch_page",
+    
     # from config_manager
-    "FileStorageManager",
+    "file_storage_manager",
     
     # from model
     "get_model_path",

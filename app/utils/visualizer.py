@@ -2,7 +2,6 @@ from typing import List, Tuple
 import numpy as np
 import cv2
 
-
 class Visualizer:
     @staticmethod
     def visualize_vertical_lines_transparent(

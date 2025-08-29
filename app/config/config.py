@@ -26,6 +26,9 @@ BATCH_SIZE = 64
 # 圖片大小配置
 TARGET_SIZE = (1024, 1024)
 
+# 影片處理配置
+TARGET_FPS = 10
+
 # 儲存設定到瀏覽器的 key
 STORAGE_KEY = "vessel_saved_configs"
 
@@ -40,6 +43,7 @@ YOLO_CONFIG = {
     "save": False,
     "stream": False,
     "retina_masks": True,
+    "half": True,
 }
 
 # 處理配置
@@ -61,7 +65,7 @@ VISUALIZATION_CONFIG = {
 }
 
 # 線條提取配置
-LINE_EXTRACTION_CONFIG = {
+LINE_CONFIG = {
     "sample_interval": 5,         # x 軸採樣步距
     "gradient_search_top": 5,     # 往上搜尋的最大像素距離
     "gradient_search_bottom": 5,  # 往下搜尋的最大像素距離
@@ -96,10 +100,10 @@ DEFAULT_CONFIGS = {
         "selected_model": DEFAULT_MODEL,
         "pixel_size_mm": PROCESSING_CONFIG["pixel_size_mm"],
         "confidence_threshold": YOLO_CONFIG["conf"],
-        "sample_interval": LINE_EXTRACTION_CONFIG["sample_interval"],
-        "gradient_search_top": LINE_EXTRACTION_CONFIG["gradient_search_top"],
-        "gradient_search_bottom": LINE_EXTRACTION_CONFIG["gradient_search_bottom"],
-        "keep_ratio": LINE_EXTRACTION_CONFIG["keep_ratio"],
+        "sample_interval": LINE_CONFIG["sample_interval"],
+        "gradient_search_top": LINE_CONFIG["gradient_search_top"],
+        "gradient_search_bottom": LINE_CONFIG["gradient_search_bottom"],
+        "keep_ratio": LINE_CONFIG["keep_ratio"],
         "line_thickness": VISUALIZATION_CONFIG["line_thickness"],
         "line_alpha": VISUALIZATION_CONFIG["line_alpha"],
         "display_labels": VISUALIZATION_CONFIG["display_labels"],
