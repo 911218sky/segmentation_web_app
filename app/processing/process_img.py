@@ -31,7 +31,10 @@ def process_batch_images(
         line_config = LINE_CONFIG.copy()
     if vis_config is None:
         vis_config = VISUALIZATION_CONFIG.copy()
- 
+     
+    extractor = LineExtractor()
+    visualizer = Visualizer()
+    
     results = []
     
     # 獲取 yolo 配置 並覆蓋 conf 參數
@@ -42,6 +45,7 @@ def process_batch_images(
     
     n = len(images)
     total_batches = math.ceil(n / BATCH_SIZE)
+    
 
     # 如果提供了 region（原始座標系），先轉到 resized 座標系
     if region is not None:
@@ -54,8 +58,8 @@ def process_batch_images(
         start = batch_idx * BATCH_SIZE
         batch = images[start : start + BATCH_SIZE]
 
-        # 轉 PIL -> BGR np.ndarray
-        batch_arrays = [cv2.cvtColor(np.array(pil), cv2.COLOR_RGB2BGR) for _, pil in batch]
+        # 轉 PIL -> np.ndarray
+        batch_arrays = [np.array(pil.convert("RGB")) for _, pil in batch]
 
         # 等比縮放 + 黑邊填充 (僅在記憶體中)
         resized_results = batch_uniform_resize(
@@ -67,9 +71,6 @@ def process_batch_images(
 
         # YOLO 預測
         yolo_outputs = predictor.predict(resized_images, **yolo_config)
-
-        extractor = LineExtractor()
-        visualizer = Visualizer()
 
         # 逐張分析
         for idx_in_batch, (filename, _) in enumerate(batch):
@@ -109,7 +110,7 @@ def process_batch_images(
             )
 
             # 視覺化直線
-            vis_bgr = visualizer.visualize_vertical_lines_with_mm(
+            vis_img = visualizer.visualize_vertical_lines_with_mm(
                 resized_img,
                 verticals,
                 pixel_size_mm=pixel_size_mm,
@@ -130,13 +131,12 @@ def process_batch_images(
                 'min_length':   float(np.min(lengths)) if lengths else 0.0,
             }
 
-            # BGR -> RGB -> PIL
-            rgb = cv2.cvtColor(vis_bgr, cv2.COLOR_BGR2RGB)
-            pil_out = Image.fromarray(rgb)
-
+            # 轉回 PIL Image
+            vis_img = Image.fromarray(vis_img)
+            
             results.append({
                 'filename': filename,
-                'result': pil_out,
+                'result': vis_img,
                 'stats': stats,
                 'success': True
             })
