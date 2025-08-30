@@ -9,8 +9,8 @@ from config import (
     VISUALIZATION_CONFIG,
     YOLO_CONFIG,
 )
+from .video_Interval_processor import VideoIntervalProcessor, IntervalStat
 from utils.line_extractor import LineExtractor
-from processing import VideoIntervalProcessor, IntervalStat
 from utils.visualizer import Visualizer
 from utils.yolo_predictor import YOLOPredictor
 
