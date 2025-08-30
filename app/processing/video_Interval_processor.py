@@ -296,8 +296,6 @@ class VideoIntervalProcessor:
 
                 cur_f += 1
 
-            # 殘留送推理
-            self.predictor.clear_cache()
             flush_batch()
             if pipe is not None:
                 pipe.close()
@@ -325,5 +323,7 @@ class VideoIntervalProcessor:
                 file_path=out_path,
             )
 
+        # 殘留送推理
+        self.predictor.clear_cache()
         cap.release()
         return stats

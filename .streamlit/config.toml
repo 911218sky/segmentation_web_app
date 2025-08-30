@@ -1,7 +1,5 @@
 [server]
 # 生產環境配置
-port = 3012
-address = "0.0.0.0"
 runOnSave = false
 maxUploadSize = 2000
 
@@ -12,5 +10,3 @@ level = "info"
 [browser]
 # 生產環境瀏覽器配置
 gatherUsageStats = false
-serverAddress = "0.0.0.0"
-serverPort = 3012

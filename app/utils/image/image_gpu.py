@@ -1,6 +1,7 @@
-from pathlib import Path
-from typing import List, Tuple, Optional, Union
 from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
+
 import cv2
 import numpy as np
 import torch
