@@ -1,10 +1,13 @@
+import gc
 import os
 import sys
 from pathlib import Path
-from typing import Optional, Tuple, Union, List, Any
-import numpy as np
-from PIL import Image
+from typing import Any, List, Optional, Tuple, Union
+
 import cv2
+import numpy as np
+import torch
+from PIL import Image
 
 # 添加父目錄到路徑
 current_dir = Path(__file__).resolve().parent.parent
@@ -25,10 +28,17 @@ class YOLOPredictor:
         """
         self.model = YOLO(str(weights_path), task="segment")
     
+    def clear_cache(self):
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+        gc.collect()
+        
     def predict(
       self,
       source: Union[Path, str, np.ndarray, list],
       task: str = "segment",
+      to_cpu: bool = True,
       **kwargs
     ) -> List[Any]:
         def to_model_input(x):
@@ -54,10 +64,18 @@ class YOLOPredictor:
         else:
             raise TypeError(f"Unsupported type for source: {type(source)}. Expect Path, str, np.ndarray, or list[...]")
 
-        res = self.model.predict(task=task, source=src_arg, **kwargs)
-        if isinstance(res, (list, tuple)):
-            return list(res)
-        return [res]
+        with torch.inference_mode():
+            results_iter = self.model.predict(
+                task=task, source=src_arg, **kwargs
+            )
+            res = results_iter
+            if isinstance(res, (list, tuple)):
+                res = list(res)
+            else:
+                res = [res]
+            if to_cpu:
+                res = [r.cpu() if hasattr(r, "cpu") else r for r in res]
+            return res
         
     @staticmethod
     def extract_max_confidence_segment(result) -> Tuple[Optional[np.ndarray], Optional[float], Optional[np.ndarray]]:

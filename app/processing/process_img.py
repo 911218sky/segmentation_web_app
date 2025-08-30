@@ -140,5 +140,8 @@ def process_batch_images(
                 'stats': stats,
                 'success': True
             })
+    
+    # 釋放 GPU 快取
+    predictor.clear_cache()
 
     return results

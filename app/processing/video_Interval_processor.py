@@ -6,7 +6,14 @@ import math
 import cv2
 import numpy as np
 
-from config import * 
+from config import (
+    BATCH_SIZE,
+    LINE_CONFIG,
+    TARGET_FPS,
+    OUTPUT_DIR,
+    TARGET_SIZE,
+    VISUALIZATION_CONFIG,
+)
 from utils.line_extractor import LineExtractor
 from utils.canvas import convert_original_xywh_to_resized
 from utils.ffmpeg_pipe import FFmpegPipe
@@ -290,6 +297,7 @@ class VideoIntervalProcessor:
                 cur_f += 1
 
             # 殘留送推理
+            self.predictor.clear_cache()
             flush_batch()
             if pipe is not None:
                 pipe.close()

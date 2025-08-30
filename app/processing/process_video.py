@@ -10,7 +10,7 @@ from config import (
     YOLO_CONFIG,
 )
 from utils.line_extractor import LineExtractor
-from processing.video_processor import VideoIntervalProcessor, IntervalStat
+from processing import VideoIntervalProcessor, IntervalStat
 from utils.visualizer import Visualizer
 from utils.yolo_predictor import YOLOPredictor
 

@@ -21,7 +21,7 @@ AVAILABLE_MODELS = {
 DEFAULT_MODEL = "v3.0 (beta) new"
 
 # 批次處理大小
-BATCH_SIZE = 64
+BATCH_SIZE = 32 * 3
 
 # 圖片大小配置
 TARGET_SIZE = (1024, 1024)
