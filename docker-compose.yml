@@ -19,7 +19,6 @@ services:
       - ./scripts:/app/scripts
       # 如果你在 host 上開發並希望容器內可以讀程式碼
       - ./app:/app/app:ro
-      - ./yolov12:/app/yolov12:ro
     restart: unless-stopped
 
     # 如果使用 GPU，請確保主機安裝 NVIDIA Container Toolkit

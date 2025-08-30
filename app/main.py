@@ -71,7 +71,7 @@ def main():
         format_func=lambda x: PAGES[x],
         default=st.session_state.active_page,
         key="active_page_control",
-        on_change=None 
+        width="stretch",
     )
     
     if page == "images":

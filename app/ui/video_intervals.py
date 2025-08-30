@@ -114,19 +114,18 @@ def video_intervals(
     st.markdown("### ⏱️ 設定影片處理區間（秒）")
     st.markdown("輸入範例：`75`、`75.5`、`01:15` 或 `0:01:15`")
 
-    # 新增區間表單（提交後清空輸入）
-    with st.form(key=f"{session_key}_add_form", clear_on_submit=True):
-        c1, c2, c3 = st.columns([1.6, 1.6, 0.6])
-        with c1:
-            start_raw = st.text_input("開始 (秒 或 hh:mm:ss)",
-                                      placeholder="例如 75 或 00:01:15",
-                                      key=f"{session_key}_start")
-        with c2:
-            end_raw = st.text_input("結束 (秒 或 hh:mm:ss)",
-                                    placeholder="例如 100 或 00:01:40",
-                                    key=f"{session_key}_end")
-        with c3:
-            add_btn = st.form_submit_button("➕ 新增區間")
+    # 新增區間表單
+    c1, c2, c3 = st.columns([1.6, 1.6, 0.6])
+    with c1:
+        start_raw = st.text_input("開始 (秒 或 hh:mm:ss)",
+                                    placeholder="例如 75 或 00:01:15",
+                                    key=f"{session_key}_start")
+    with c2:
+        end_raw = st.text_input("結束 (秒 或 hh:mm:ss)",
+                                placeholder="例如 100 或 00:01:40",
+                                key=f"{session_key}_end")
+    with c3:
+        add_btn = st.button("➕ 新增區間")
     if add_btn:
         try:
             s = _parse_time_to_seconds(start_raw)

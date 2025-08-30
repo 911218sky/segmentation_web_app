@@ -12,6 +12,10 @@ def save_uploaded_to_dir(uploaded_file: UploadedFile, base_dir: Path = TEMP_DIR)
     
     tmp_file = base_dir / f"{uploaded_file.name}"
     
+    if tmp_file.exists():
+        print(f"file is exists, skip save {tmp_file}")
+        return tmp_file
+    
     try:
         # 如果之前讀過 upload，這裡先回到開頭
         uploaded_file.seek(0)

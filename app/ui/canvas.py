@@ -9,6 +9,57 @@ from config import CANVAS_CONFIG
 from config.language import get_text
 from utils.canvas import process_image_for_canvas, XYWH, FileLike
 
+def ndarray_to_pil(img: np.ndarray, convert_bgr_to_rgb: bool = True) -> Optional[PILImage.Image]:
+    """
+    將 numpy.ndarray 轉為 PIL.Image，並自動處理：
+      - float (0..1) -> uint8 (0..255)
+      - BGR -> RGB (預設啟用，因為 OpenCV 讀到的是 BGR)
+      - 支援灰階 (H,W)、RGB/BGR (H,W,3)、含 alpha (H,W,4)
+    參數:
+      convert_bgr_to_rgb: 若為 True，會把 3-channel 的影像做反序處理 (BGR->RGB)
+    """
+    if img is None:
+        return None
+
+    if not isinstance(img, np.ndarray):
+        raise TypeError("img must be a numpy.ndarray")
+
+    # 如果是 float (值域常見 0..1)，轉回 0..255
+    if np.issubdtype(img.dtype, np.floating):
+        # 若值域看起來是在 0..1，放大；否則直接 clip->uint8
+        maxv = float(np.nanmax(img))
+        if maxv <= 1.0:
+            img = (img * 255.0).clip(0, 255).astype(np.uint8)
+        else:
+            img = img.clip(0, 255).astype(np.uint8)
+    else:
+        # 其他整數類型，先 clip 再轉 uint8
+        if img.dtype != np.uint8:
+            img = img.clip(0, 255).astype(np.uint8)
+
+    # 處理維度
+    if img.ndim == 2:
+        # 灰階
+        return PILImage.fromarray(img, mode="L")
+
+    if img.ndim == 3:
+        _, _, c = img.shape
+        if c == 3:
+            # 預設把 BGR 轉成 RGB（如果你確定是 RGB 可把 convert_bgr_to_rgb=False）
+            if convert_bgr_to_rgb:
+                img = img[..., ::-1]  # BGR -> RGB
+            return PILImage.fromarray(img, mode="RGB")
+        elif c == 4:
+            # 假設是 BGRA 或 RGBA；把順序調成 RGBA（把 alpha 保留）
+            if convert_bgr_to_rgb:
+                img = img[..., [2,1,0,3]]  # BGRA -> RGBA
+            return PILImage.fromarray(img, mode="RGBA")
+        else:
+            # 非預期通道數，嘗試降維或報錯
+            raise ValueError(f"Unsupported channel number: {c}")
+
+    raise ValueError("Unsupported ndarray shape for image conversion")
+
 def canvas(
     uploaded_file: FileLike,
     rect_width: int = CANVAS_CONFIG["rect_width"],
@@ -26,7 +77,7 @@ def canvas(
     
     # 如果上傳的是 numpy 陣列，則轉換為 PIL 圖片
     if isinstance(uploaded_file, np.ndarray):
-        uploaded_file = PILImage.fromarray(uploaded_file)
+        uploaded_file = ndarray_to_pil(uploaded_file)
 
     # 處理圖片（resized 輸出用於 canvas 背景）
     resized_img, orig_size, canvas_size = process_image_for_canvas(uploaded_file)
@@ -89,7 +140,7 @@ def canvas(
     }
 
     # 畫布元件
-    with st.form("region_form", clear_on_submit=True):
+    with st.form("region_form"):
         canvas_result = st_canvas(
             fill_color="rgba(255, 165, 0, 0.3)",
             stroke_width=2,
@@ -139,8 +190,8 @@ def canvas(
         st.info(get_text("interactive_selection_help") + f" (目前選擇區域: {region})")
 
         submitted = st.form_submit_button("套用選區")
+        
         if submitted:
-            st.session_state.region = region
             st.success("選區已儲存")
 
     return region
