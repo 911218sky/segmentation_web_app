@@ -1,10 +1,33 @@
-from typing import Optional
+from typing import Optional, Tuple
 from pathlib import Path
 import gdown
 import streamlit as st
 import re
 from utils.file import clean_folder
 from config import TEMP_DIR
+
+_DRIVE_FILE_RE = re.compile(
+    r'^https?://drive\.google\.com/file/d/([A-Za-z0-9_-]+)(?:/view(?:\?.*)?)?$'
+)
+
+def is_drive_file_url(url: str) -> Tuple[bool, Optional[str]]:
+    """
+    檢查 url 是否為 Google Drive 的 file/view 格式。
+    回傳 (is_match, file_id_or_None)。
+
+    範例合法格式：
+    - https://drive.google.com/file/d/<fileId>/view
+    - https://drive.google.com/file/d/<fileId>/view?usp=drive_link
+    - http://drive.google.com/file/d/<fileId>/view
+
+    不會匹配其它 drive 形式（例如 drive.google.com/open?id=...）：
+    """
+    if not isinstance(url, str):
+        return False, None
+    m = _DRIVE_FILE_RE.match(url.strip())
+    if not m:
+        return False, None
+    return True, m.group(1)
 
 def _is_video_magic(path: Path) -> bool:
     """
@@ -70,7 +93,7 @@ def google_video_update(cache: bool = True) -> Optional[Path]:
     video_dir.mkdir(parents=True, exist_ok=True)
     clean_folder(video_dir, max_items=10, max_age_days=5)
 
-    st.subheader("🎞️ 從 Google Drive 分享連結下載影片（使用 gdown）")
+    st.subheader("🎞️ 從 Google Drive 分享連結下載影片")
     hint = "貼上 Google Drive 分享連結 或 直接貼 FILE_ID（例：https://drive.google.com/file/d/FILE_ID/view）"
     url_input = st.text_area(
         "Drive 分享連結 或 file id",
@@ -92,6 +115,10 @@ def google_video_update(cache: bool = True) -> Optional[Path]:
 
     # 若沒有按下 Download 按鈕，直接回傳 None
     if not download_btn:
+        return None
+      
+    if not is_drive_file_url(url_input):
+        st.error("請輸入 Google Drive 分享連結或 file id")
         return None
 
     # gdown 會嘗試自動命名並回傳實際檔案路徑

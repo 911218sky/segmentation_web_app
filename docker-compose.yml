@@ -7,7 +7,7 @@ services:
       args:
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
-    image: vessel-measure:latest
+    image: sky1218/vessel-measure:latest
     container_name: vessel_measure
     ports:
       - "3015:8501"
