@@ -18,10 +18,10 @@ from ui import (
     image_downloads,
     
     # video
-    upload_video,
     handle_video_processing,
     video_results,
     video_downloads,
+    google_video_update,
 )
 
 def init_session():
@@ -79,9 +79,9 @@ def main():
         if uploads:
             handle_image_processing(uploads, params)
     elif page == "videos":
-        upload = upload_video()
-        if upload:
-            handle_video_processing(upload, params)
+        video_path = google_video_update()
+        if video_path:
+            handle_video_processing(video_path, params)
     elif page == "results":
         sub = st.tabs(["📷 圖片結果", "🎞️ 影片結果"])
         with sub[0]:
@@ -90,7 +90,6 @@ def main():
         with sub[1]:
             video_downloads()
             video_results()
-
 
 if __name__ == "__main__":
     main()

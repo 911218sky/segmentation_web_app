@@ -12,8 +12,10 @@ from .image import (
     image_downloads,
 )
 
+from .google_update import google_video_update
+
 from .video import (
-    upload_video,
+    
     handle_video_processing,
     video_results,
     video_downloads,
@@ -34,8 +36,8 @@ __all__ = [
     
     # video
     "video_intervals",
-    "upload_video",
     "handle_video_processing",
     "video_results",
     "video_downloads",
+    "google_video_update",
 ]

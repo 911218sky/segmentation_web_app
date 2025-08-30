@@ -2,19 +2,15 @@ from typing import Optional, Dict, Any, List, Tuple
 import os
 import math
 import cv2
-import time
 import numpy as np
-
+from pathlib import Path
 import streamlit as st
-from streamlit_chunked_upload import uploader as chunk_uploader
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from config import (
     TEMP_DIR,
     switch_page,
 )
 from utils.file import (
-    save_uploaded_to_dir,
     clean_folder,
 )
 from utils.excel import generate_excel_video_results
@@ -27,29 +23,6 @@ from ui import (
     video_intervals,
 )
 
-def upload_video(cache: bool = True) -> Optional[UploadedFile]:
-    st.subheader("🎞️ 上傳影片")
-    
-    # st.session_state.video_uploader = st.file_uploader(
-    #     "選擇影片 (mp4/mov/avi/mkv)", type=['mp4','mov','avi','mkv'],
-    #     accept_multiple_files=False,
-    # )
-    
-    if not cache or not st.session_state.get("video_uploader"):
-        st.session_state.video_uploader = chunk_uploader(
-            label="選擇影片 (mp4/mov/avi/mkv)",
-            chunk_size=2,
-            type=['mp4','mov','avi','mkv'],
-            uploader_msg="選擇影片 (mp4/mov/avi/mkv) 建議不超過 1GB",
-        )
-    
-    show_clear_button = st.button("🗑️ 清空影片")
-    if show_clear_button:
-        st.session_state.video_uploader = None
-        st.rerun()
-    
-    return st.session_state.video_uploader
-
 @st.cache_data(show_spinner=False)
 def get_first_frame(video_path: str) -> Optional[np.ndarray]:
     cap = cv2.VideoCapture(video_path)
@@ -60,38 +33,18 @@ def get_first_frame(video_path: str) -> Optional[np.ndarray]:
     return frame
   
 def handle_video_processing(
-    upload: UploadedFile,
+    video_path: Path,
     params: Dict[str, Any],
 ):
-    if upload is None:
+    if video_path is None:
         return
     
     # 保存上傳的影片
-    video_dir = TEMP_DIR / "uploaded_videos"
     output_dir = TEMP_DIR / "output_videos"
-    video_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # 清理過期檔案
-    clean_folder(video_dir, max_items=2, max_age_days=1)
     clean_folder(output_dir, max_items=20, max_age_days=5)
-    
-    # 保存上傳的影片快取
-    if st.session_state.get("last_video_data") is None:
-        video_path = save_uploaded_to_dir(upload, video_dir)
-        st.session_state["last_video_data"] = {
-            "video_path": video_path,
-            "video_id": id(upload),
-        }
-    # 如果上傳的影片有變更，則重新保存
-    elif id(upload) != st.session_state["last_video_data"]["video_id"]:
-        video_path = save_uploaded_to_dir(upload, video_dir)
-        st.session_state["last_video_data"] = {
-            "video_path": video_path,
-            "video_id": id(upload),
-        }
-    else:
-        video_path = st.session_state["last_video_data"]["video_path"]
     
     video_slot = st.empty()
     if video_path.exists():
