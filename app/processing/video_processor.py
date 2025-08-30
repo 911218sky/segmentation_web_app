@@ -10,8 +10,8 @@ from config import *
 from utils.line_extractor import LineExtractor
 from utils.canvas import convert_original_xywh_to_resized
 from utils.ffmpeg_pipe import FFmpegPipe
-from utils.image import batch_uniform_resize
-from utils.stability_filter import SlidingStabilityFilter
+from utils.image import batch_uniform_resize_cuda
+from utils.stability_filter import SlidingStabilityFilter, StabilityConfig
 from utils.visualizer import Visualizer
 from utils.yolo_predictor import YOLOPredictor
 
@@ -40,15 +40,17 @@ class VideoIntervalProcessor:
 
     def __init__(
         self,
+        *,
         predictor: YOLOPredictor,
         line_extractor: LineExtractor,
         visualizer: Visualizer,
-        stability_filter: Optional[SlidingStabilityFilter] = None,
+        stability_filter_config: Optional[StabilityConfig] = None,
         pixel_size_mm: float = 0.30,
         yolo_config: Optional[dict] = None,
         line_config: Optional[dict] = None,
         visualization_config: Optional[dict] = None,
         draw_overlay: bool = True,
+        save_video: bool = True,
     ) -> None:
         """
         Args:
@@ -65,19 +67,19 @@ class VideoIntervalProcessor:
         self.predictor = predictor
         self.line_extractor = line_extractor
         self.visualizer = visualizer
-
-        self.stability_filter = stability_filter
-
-        self.pixel_size_mm = float(pixel_size_mm)
-        self.yolo_config = (yolo_config or {}).copy()
-        self.line_config = line_config or {}
-        self.visualization_config = visualization_config or {}
+        self.stability_filter_config = stability_filter_config
+        self.pixel_size_mm = pixel_size_mm
+        self.yolo_config = yolo_config
+        self.line_config = line_config
+        self.visualization_config = visualization_config
         self.draw_overlay = draw_overlay
-
-        # 批次大小：yolo_config['batch'] > 全域預設
+        self.save_video = save_video
         self.batch_size: int = int(
             self.yolo_config.get("batch", BATCH_SIZE)
         )
+
+        self.pixel_size_mm = float(pixel_size_mm)
+        self.yolo_config = (yolo_config or {}).copy()
 
         # 強制 img size 與 TARGET_SIZE 一致（Ultralytics 接受list of np arrays）
         if "imgsz" not in self.yolo_config and "img_size" not in self.yolo_config:
@@ -88,7 +90,8 @@ class VideoIntervalProcessor:
         self,
         frame: np.ndarray,
         result,
-        region_resized: Optional[Tuple[int, int, int, int]] = None
+        region_resized: Optional[Tuple[int, int, int, int]] = None,
+        stab: Optional[SlidingStabilityFilter] = None,
     ) -> Tuple[Optional[float], np.ndarray]:
         """
         注意：這裡的 frame 是 **已 letterbox 到 TARGET_SIZE 的影格**，
@@ -117,8 +120,7 @@ class VideoIntervalProcessor:
 
         # 跨幀穩定檢查
         mean_mm = mm_mean_from_lines(lines, pixel_size_mm=self.pixel_size_mm)
-        if self.stability_filter is not None and not self.stability_filter.add(mean_mm):
-            # 若判為不合理，直接返回原影格，不累計統計量；若已連續異常到停就交由外層處理
+        if stab is not None and not stab.add(mean_mm):
             return None, frame
 
         # 視覺化
@@ -178,6 +180,7 @@ class VideoIntervalProcessor:
         Returns:
             stats：每個區間的 IntervalStat 統計
         """
+
         output_dir.mkdir(parents=True, exist_ok=True)
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
@@ -205,44 +208,57 @@ class VideoIntervalProcessor:
             end_f = min(int(round(end_s * src_fps)), max(total_frames - 1, 0))
 
             sampled = self._choose_sampled_indices(start_f, end_f, src_fps, target_fps)
+            
+            if self.stability_filter_config is not None:
+                stab = SlidingStabilityFilter(self.stability_filter_config)
+            else:
+                stab = None
 
             # 這段輸出的影片 writer（解析度為 TARGET_SIZE）
             out_fps = target_fps if target_fps > 0 else src_fps
             out_path = output_dir / f"{base}_seg_{k}_{int(start_s)}-{int(end_s)}_{int(round(out_fps))}fps.mp4"
-            pipe = FFmpegPipe(
-                str(out_path),
-                TARGET_SIZE[0],
-                TARGET_SIZE[1],
-                fps=out_fps,
-                preset="ultrafast",
-                crf=23,
-                pixel_format="bgr24"
-            )
+            pipe = None
+            if self.save_video:
+                pipe = FFmpegPipe(
+                    str(out_path),
+                    TARGET_SIZE[0],
+                    TARGET_SIZE[1],
+                    fps=out_fps,
+                    preset="ultrafast",
+                    crf=23,
+                    pixel_format="bgr24"
+                )
 
             frame_means: List[Tuple[int, float]] = []
             batch_frames: List[np.ndarray] = []
             batch_indices: List[int] = []
 
-            # 批次送入 YOLO 推理並後處理（先 resize 到 TARGET_SIZE）
+            # 批次送入 YOLO 推理並後處理（先用 GPU 等比縮放到 TARGET_SIZE）
             def flush_batch() -> None:
                 nonlocal batch_frames, batch_indices, frame_means
                 if not batch_frames:
                     return
 
-                # 等比例 letterbox 到 TARGET_SIZE（在記憶體中）
-                resized_results = batch_uniform_resize(batch_frames, target_size=TARGET_SIZE)
-                resized_frames = [result.resized_image for result in resized_results]
+                resized_results = batch_uniform_resize_cuda(
+                    batch_frames,
+                    target_size=TARGET_SIZE,
+                )
 
-                # 批次推理
+                resized_frames = [r.resized_image for r in resized_results]
                 predict_results = self.predictor.predict(resized_frames, **self.yolo_config)
 
                 # 逐幀後處理與寫出（frame 是 resize 後的）
                 for frm_resized, res, idx in zip(resized_frames, predict_results, batch_indices):
-                    mean_mm, frame_out = self._frame_postprocess(frm_resized, res, region_resized)
+                    mean_mm, frame_out = self._frame_postprocess(
+                        frm_resized,
+                        res,
+                        region_resized,
+                        stab,
+                    )
                     if mean_mm is not None:
                         frame_means.append((idx, mean_mm))
-                    
-                    pipe.write_frame_rgb_array(frame_out)
+                    if pipe is not None:
+                        pipe.write_frame_rgb_array(frame_out)
 
                 batch_frames.clear()
                 batch_indices.clear()
@@ -255,10 +271,9 @@ class VideoIntervalProcessor:
             cap.set(cv2.CAP_PROP_POS_FRAMES, start_f)
             cur_f = start_f
 
-            # 若需要在區間內「異常連續太多就停止」，可用同一個stability_filter實例持續累計
+            # 若需要在區間內「異常連續太多就停止」
             while cur_f <= end_f and next_needed is not None:
-                # 若外層提供了stability_filter，且已標記停止，則不再處理後續幀
-                if self.stability_filter is not None and self.stability_filter.stopped:
+                if stab is not None and stab.stopped:
                     break
 
                 ok, frame = cap.read()
@@ -276,7 +291,8 @@ class VideoIntervalProcessor:
 
             # 殘留送推理
             flush_batch()
-            pipe.close()
+            if pipe is not None:
+                pipe.close()
 
             # 區間統計
             if frame_means:

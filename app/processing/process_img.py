@@ -4,7 +4,7 @@ from typing import List, Tuple, Union, Optional, Dict, Any
 from PIL import Image
 import math
 
-from utils.image import batch_uniform_resize
+from utils.image import batch_uniform_resize_cuda
 from utils.canvas import convert_original_xywh_to_resized
 from config import (
     BATCH_SIZE,
@@ -62,7 +62,7 @@ def process_batch_images(
         batch_arrays = [np.array(pil.convert("RGB")) for _, pil in batch]
 
         # 等比縮放 + 黑邊填充 (僅在記憶體中)
-        resized_results = batch_uniform_resize(
+        resized_results = batch_uniform_resize_cuda(
             batch_arrays,
             target_size=TARGET_SIZE,
             

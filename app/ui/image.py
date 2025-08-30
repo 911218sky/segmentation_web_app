@@ -22,10 +22,17 @@ def upload_images(cache: bool = True) -> List[UploadedFile]:
     if cache and st.session_state.get("image_uploader"):
         return st.session_state.image_uploader
     
-    st.session_state.image_uploader = st.file_uploader(
-        "選擇多張圖片", type=['png','jpg','jpeg','bmp','tiff'],
-        accept_multiple_files=True,
-    )
+    if not cache or not st.session_state.get("image_uploader"):
+        st.session_state.image_uploader = st.file_uploader(
+            "選擇多張圖片", type=['png','jpg','jpeg','bmp','tiff'],
+            accept_multiple_files=True,
+        )
+    
+    show_clear_button = st.button("🗑️ 清空圖片")
+    if show_clear_button:
+        st.session_state.image_uploader = []
+        st.rerun()
+
     return st.session_state.image_uploader
 
 # 處理按鈕
@@ -33,7 +40,7 @@ def handle_image_processing(
     uploads: List[UploadedFile],
     params: Dict[str, Any],
 ):
-    if not uploads:
+    if uploads is None:
         return
     
     region = None
@@ -69,14 +76,6 @@ def handle_image_processing(
         st.session_state.img_results = results
         progress.progress(1.0)
         st.success("✅ 圖片處理完成")
-        
-        placeholder = st.empty()
-        for sec in range(3, 0, -1):
-            placeholder.info(f"{sec} 秒后自动切换到「結果與下載」頁面…")
-            time.sleep(1)
-        
-        # 清空 placeholder，再跳頁
-        placeholder.empty()
         switch_page("results")
 
     if col2.button("🗑️ 清空圖片結果"):

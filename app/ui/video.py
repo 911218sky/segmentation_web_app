@@ -63,6 +63,9 @@ def handle_video_processing(
     upload: UploadedFile,
     params: Dict[str, Any],
 ):
+    if upload is None:
+        return
+    
     # 保存上傳的影片
     video_dir = TEMP_DIR / "uploaded_videos"
     output_dir = TEMP_DIR / "output_videos"
@@ -74,7 +77,7 @@ def handle_video_processing(
     clean_folder(output_dir, max_items=20, max_age_days=5)
     
     # 保存上傳的影片快取
-    if st.session_state.get("last_video_path") is None:
+    if st.session_state.get("last_video_data") is None:
         video_path = save_uploaded_to_dir(upload, video_dir)
         st.session_state["last_video_data"] = {
             "video_path": video_path,
@@ -133,13 +136,6 @@ def handle_video_processing(
         st.session_state.video_results = stats
         st.success("✅ 影片處理完成")
         
-        placeholder = st.empty()
-        for sec in range(3, 0, -1):
-            placeholder.info(f"{sec} 秒后自动切换到「結果與下載」頁面…")
-            time.sleep(1)
-        
-        # 清空 placeholder，再跳頁
-        placeholder.empty()
         switch_page("results")
 
     if col2.button("🗑️ 清空影片結果"):

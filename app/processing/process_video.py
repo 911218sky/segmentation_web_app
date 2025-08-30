@@ -1,7 +1,7 @@
 from typing import Tuple, Union, Optional, Dict, List
 from pathlib import Path
 
-from utils.stability_filter import SlidingStabilityFilter, StabilityConfig
+from utils.stability_filter import StabilityConfig
 from config import (
     TARGET_FPS,
     OUTPUT_DIR,
@@ -40,22 +40,13 @@ def process_video(
     
     line_extractor = LineExtractor()
     visualizer = Visualizer()
-    stab = SlidingStabilityFilter(StabilityConfig(
-        init_window=20,     # 前20幀用來建立穩定基線
-        init_cv_max=0.08,   # 前段CV<8%算穩定
-        win_size=15,
-        z_thresh=3.5,
-        rel_tol=0.20,       # 後段允許±20%相對基線
-        roc_abs_max=3.0,    # 單幀跳動不可超過3 mm
-        consec_bad_stop=10, # 連續10幀不合理就提前停止
-        require_baseline=True
-    ))
+    stab_config = StabilityConfig()
     
     processor = VideoIntervalProcessor(
         predictor=predictor,
         line_extractor=line_extractor,
         visualizer=visualizer,
-        stability_filter=stab,
+        stability_filter_config=stab_config,
         pixel_size_mm=pixel_size_mm,
         yolo_config=yolo_config,
         visualization_config=vis_config,
