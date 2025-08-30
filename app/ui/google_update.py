@@ -85,14 +85,14 @@ def google_video_update(cache: bool = True) -> Optional[Path]:
     file_id = _extract_file_id_from_drive_url(url_input)
     file_path = video_dir / f"{file_id}.mp4"
 
-    # 若沒有按下 Download 按鈕，直接回傳 None
-    if not download_btn:
-        return None
-    
     if cache and file_path.exists():
         size_mb = _size_mb(file_path)
         st.success(f"已使用快取：{file_path.name} ({size_mb:.2f} MB)")
         return file_path
+
+    # 若沒有按下 Download 按鈕，直接回傳 None
+    if not download_btn:
+        return None
 
     # gdown 會嘗試自動命名並回傳實際檔案路徑
     try:
