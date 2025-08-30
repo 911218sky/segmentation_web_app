@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 from pathlib import Path
 import gdown
 import streamlit as st
@@ -10,7 +10,7 @@ _DRIVE_FILE_RE = re.compile(
     r'^https?://drive\.google\.com/file/d/([A-Za-z0-9_-]+)(?:/view(?:\?.*)?)?$'
 )
 
-def is_drive_file_url(url: str) -> Tuple[bool, Optional[str]]:
+def is_drive_file_url(url: str) -> bool:
     """
     檢查 url 是否為 Google Drive 的 file/view 格式。
     回傳 (is_match, file_id_or_None)。
@@ -23,11 +23,11 @@ def is_drive_file_url(url: str) -> Tuple[bool, Optional[str]]:
     不會匹配其它 drive 形式（例如 drive.google.com/open?id=...）：
     """
     if not isinstance(url, str):
-        return False, None
+        return False
     m = _DRIVE_FILE_RE.match(url.strip())
     if not m:
-        return False, None
-    return True, m.group(1)
+        return False
+    return True
 
 def _is_video_magic(path: Path) -> bool:
     """
