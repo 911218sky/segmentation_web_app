@@ -226,7 +226,7 @@ class VideoIntervalProcessor:
                     fps=out_fps,
                     preset="ultrafast",
                     crf=23,
-                    pixel_format="bgr24"
+                    pixel_format_in="bgr24"
                 )
 
             frame_means: List[Tuple[int, float]] = []
