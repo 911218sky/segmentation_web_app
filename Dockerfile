@@ -20,7 +20,6 @@ COPY requirements.txt requirements_yolo.txt ./
 COPY wheels ./wheels
 COPY yolov12 ./yolov12
 COPY scripts ./scripts
-COPY app ./app
 
 # 安裝系統依賴、Python 套件、安裝 yolov12，然後移除 build-time 套件與清理暫存
 RUN apt-get update && \

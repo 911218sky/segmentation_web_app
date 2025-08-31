@@ -7,7 +7,7 @@ fileWatcherType = "auto"
 headless = false
 enableCORS = true
 enableXsrfProtection = false
-maxUploadSize = 2000
+maxUploadSize = 20
 allowRunOnSave = true
 enableStaticServing = false
 

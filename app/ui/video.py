@@ -46,9 +46,10 @@ def handle_video_processing(
     # 清理過期檔案
     clean_folder(output_dir, max_items=20, max_age_days=5)
     
-    video_slot = st.empty()
-    if video_path.exists():
-        video_slot.video(str(video_path))
+    with st.form("video_preview"):
+        if video_path.exists():
+            st.video(str(video_path))
+        st.form_submit_button("重新獲取影片 (假如未出現)")
     
     intervals = video_intervals()
     

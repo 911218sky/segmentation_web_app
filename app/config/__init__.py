@@ -15,6 +15,9 @@ from .config import (
     OUTPUT_DIR,
     MODELS_DIR,
     CANVAS_CONFIG,
+    SA_FILE,
+    VIDEO_COMPRESSOR,
+    IMAGE_COMPRESSOR,
 )
 
 from .config_manager import (
@@ -56,6 +59,9 @@ __all__ = [
     "OUTPUT_DIR",
     "MODELS_DIR",
     "CANVAS_CONFIG",
+    "SA_FILE",
+    "VIDEO_COMPRESSOR",
+    "IMAGE_COMPRESSOR",
     
     # from page
     "PAGES",

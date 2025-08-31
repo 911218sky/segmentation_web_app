@@ -7,18 +7,19 @@ services:
       args:
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
+    user: "${UID:-1000}:${GID:-1000}" 
     image: sky1218/vessel-measure:latest
     container_name: vessel_measure
     ports:
       - "3015:8501"
     volumes:
-      - ./.streamlit:/app/.streamlit
       - ./user_configs:/app/user_configs
-      - ./temp:/app/temp
-      - ./models:/app/models
-      - ./scripts:/app/scripts
       # 如果你在 host 上開發並希望容器內可以讀程式碼
       - ./app:/app/app:ro
+      - ./scripts:/app/scripts:ro
+      - ./secrets:/app/secrets:ro
+      - ./.streamlit:/app/.streamlit:ro
+      - ./models:/app/models:ro
     restart: unless-stopped
 
     # 如果使用 GPU，請確保主機安裝 NVIDIA Container Toolkit

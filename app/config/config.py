@@ -7,6 +7,9 @@ OUTPUT_DIR = BASE_DIR / "output"
 MODELS_DIR = BASE_DIR / "models"
 
 # 配置檔案路徑
+SA_FILE = BASE_DIR / "secrets" / "service-account.json"
+
+# 配置檔案路徑
 STORAGE_DIR = BASE_DIR / "user_configs"
 CONFIG_FILE = STORAGE_DIR / "saved_configs.json"
 
@@ -28,6 +31,10 @@ TARGET_SIZE = (1024, 1024)
 
 # 影片處理配置
 TARGET_FPS = 10
+# 是否壓縮影片
+VIDEO_COMPRESSOR = True
+# 是否壓縮圖片
+IMAGE_COMPRESSOR = True
 
 # 儲存設定到瀏覽器的 key
 STORAGE_KEY = "vessel_saved_configs"

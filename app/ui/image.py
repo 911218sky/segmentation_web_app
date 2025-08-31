@@ -1,5 +1,4 @@
 import math
-import time
 import zipfile
 from io import BytesIO
 from typing import List, Dict, Any
@@ -7,7 +6,6 @@ from typing import List, Dict, Any
 import streamlit as st
 from PIL import Image
 from streamlit.runtime.uploaded_file_manager import UploadedFile
-
 from config import (
     BATCH_SIZE,
     # page config
@@ -16,6 +14,7 @@ from config import (
 from ui import canvas
 from utils.excel import generate_excel_img_results
 from processing import process_batch_images
+from utils.canvas import FileLike
 
 # 上傳區
 def upload_images(cache: bool = True) -> List[UploadedFile]:
@@ -37,7 +36,7 @@ def upload_images(cache: bool = True) -> List[UploadedFile]:
 
 # 處理按鈕
 def handle_image_processing(
-    uploads: List[UploadedFile],
+    uploads: List[FileLike],
     params: Dict[str, Any],
 ):
     if uploads is None:

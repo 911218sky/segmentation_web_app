@@ -1,7 +1,7 @@
 [server]
 # 生產環境配置
 runOnSave = false
-maxUploadSize = 2000
+maxUploadSize = 20
 
 [logger]
 # 生產環境簡潔日誌

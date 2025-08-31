@@ -16,6 +16,7 @@ from ui import (
     handle_image_processing,
     image_results,
     image_downloads,
+    google_img_update,
     
     # video
     handle_video_processing,
@@ -75,9 +76,11 @@ def main():
     )
     
     if page == "images":
-        uploads = upload_images()
-        if uploads:
-            handle_image_processing(uploads, params)
+        uploads_imgs = upload_images()
+        if not uploads_imgs:
+            uploads_imgs = google_img_update()
+        if uploads_imgs:
+            handle_image_processing(uploads_imgs, params)
     elif page == "videos":
         video_path = google_video_update()
         if video_path:
