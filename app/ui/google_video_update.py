@@ -11,6 +11,9 @@ from utils.drive_fetcher import DriveFetcher, DriveFetchResult
 # Google Drive URL matcher
 _DRIVE_FILE_RE = re.compile(r'https?://(drive|docs)\.google\.com/.+')
 
+# 100 MB
+MAX_COMPRESS_SIZE = 1024 * 1024 * 100
+
 # 下載緩存資料夾
 UPDATE_DIR = Path(TEMP_DIR) / "uploaded_videos"
 UPDATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -89,10 +92,15 @@ def google_video_update() -> Optional[Path]:
             # 假如有獲取結果檢查是否有快取
             if results and VIDEO_COMPRESSOR:
                 com_path = _get_compressed_path(results[0].path)
+                # 檢查壓縮後的影片是否存在
                 if com_path.exists():
                     results[0].path = com_path
                     _set_cache(link, results[0])
                     return com_path
+                # 壓縮後的影片不存在，檢查原始影片是否存在
+                if results[0].path.exists():
+                    _set_cache(link, results[0])
+                    return results[0].path
             results = fetcher.fetch(link, download_dir=UPDATE_DIR, recurse=False)
     except Exception as e:
         st.error(f"下載過程發生錯誤：{e}")
@@ -115,11 +123,12 @@ def google_video_update() -> Optional[Path]:
 
     st.success(f"下載完成：{path.name}")
 
-    if VIDEO_COMPRESSOR:
+    # 假如超過壓縮影片門檻，壓縮影片
+    if first.size > MAX_COMPRESS_SIZE and VIDEO_COMPRESSOR:
         try:
             com_path = _get_compressed_path(path)
             with st.spinner("壓縮影片中..."):
-                compressor.compress(str(path), str(com_path), overwrite=True)
+                compressor.compress(str(path), str(com_path), overwrite=True, quiet=True)
             st.success(f"壓縮完成：{com_path.name}")
             # 刪除原檔
             path.unlink()

@@ -11,6 +11,9 @@ from utils.drive_fetcher import DriveFetcher, DriveFetchResult
 # Google Drive URL matcher
 _DRIVE_FILE_RE = re.compile(r'https?://(drive|docs)\.google\.com/.+')
 
+# 壓縮門檻 2 MB
+MAX_COMPRESS_SIZE = 1024 * 1024 * 2
+
 # 下載緩存資料夾
 UPDATE_DIR = Path(TEMP_DIR) / "uploaded_images"
 UPDATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -104,8 +107,12 @@ def google_img_update() -> Optional[List[Path]]:
                 # 壓縮圖片
                 for r in results:
                     com_path = _get_compressed_path(r.path, r.path.suffix)
+                    # 壓縮後的圖片存在，則更新結果路徑
                     if com_path.exists():
                         r.path = com_path
+                    # 壓縮後的圖片不存在，檢查原始圖片是否存在
+                    elif r.path.exists():
+                        pass
                     else:
                         all_exists = False
                         break
@@ -125,12 +132,13 @@ def google_img_update() -> Optional[List[Path]]:
     if IMAGE_COMPRESSOR:
         with st.spinner("壓縮圖片中..."):
             for r in results:
-                com_path = _get_compressed_path(r.path, r.path.suffix)
-                _compress_with_pillow(r.path, com_path, quality=85, to_webp=False)
-                # 刪除原始圖片
-                r.path.unlink()
-                # 更新結果路徑
-                r.path = com_path
+                if r.size > MAX_COMPRESS_SIZE:
+                    com_path = _get_compressed_path(r.path, r.path.suffix)
+                    _compress_with_pillow(r.path, com_path, quality=85, to_webp=False)
+                    # 刪除原始圖片
+                    r.path.unlink()
+                    # 更新結果路徑
+                    r.path = com_path
             st.success(f"壓縮完成 共 {len(results)} 張圖片")
 
     # 儲存至連結緩存

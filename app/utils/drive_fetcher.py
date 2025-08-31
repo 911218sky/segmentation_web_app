@@ -290,7 +290,7 @@ class DriveFetcher:
             name=name,
             mime_type=mime,
             path=out_path,
-            size=size,
+            size=int(size) if size else None,
             error=None,
         )
         results.append(res)
