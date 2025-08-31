@@ -67,7 +67,7 @@ def google_video_update() -> Optional[Path]:
     )
 
     download_btn = st.button("獲取影片", key="download_video_btn")
-    st.info("請輸入 Google Drive 分享連結或 file id，然後按 獲取影片")
+    st.info("請輸入 Google Drive 分享連結然後按獲取影片 範例 https://drive.google.com/file/d/1jmK_i5AvezX6fCAZLhTrxm0dUnI3KLQT/view?usp=drive_link")
 
     link = url_input.strip()
     if link and not _is_drive_link(link):

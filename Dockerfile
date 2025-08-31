@@ -1,5 +1,5 @@
 # Dockerfile
-FROM python:3.11.13-slim
+FROM sky1218/pytorch:2.7.1-cuda12.8-py3.11
 
 # build args
 ARG USER_ID=1000
@@ -26,7 +26,6 @@ RUN apt-get update \
       libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
       libjpeg-dev zlib1g-dev libsndfile1 libssl-dev libffi-dev pkg-config \
  && python -m pip install --upgrade pip setuptools wheel \
- && pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 \
  && pip install --no-cache-dir -r requirements_yolo.txt \
  && pip install --no-cache-dir -r requirements.txt \
  && cd yolov12 && pip install --no-cache-dir -e . && cd .. \

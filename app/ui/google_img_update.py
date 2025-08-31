@@ -80,7 +80,7 @@ def google_img_update() -> Optional[List[Path]]:
     )
 
     download_btn = st.button("獲取圖片", key="download_img_btn")
-    st.info("請輸入 Google Drive 分享連結或 file id，然後按 獲取圖片")
+    st.info("請輸入 Google Drive 分享連結然後按獲取圖片 範例 https://drive.google.com/drive/folders/1ppSMdn1YYdc8rN56uKgWJhqezzneajAY?usp=drive_link")
 
     link = url_input.strip()
     if link and not _is_drive_link(link):
