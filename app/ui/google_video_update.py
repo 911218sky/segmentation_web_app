@@ -11,8 +11,8 @@ from utils.drive_fetcher import DriveFetcher, DriveFetchResult
 # Google Drive URL matcher
 _DRIVE_FILE_RE = re.compile(r'https?://(drive|docs)\.google\.com/.+')
 
-# 100 MB
-MAX_COMPRESS_SIZE = 1024 * 1024 * 100
+# 150 MB
+MAX_COMPRESS_SIZE = 1024 * 1024 * 150
 
 # 下載緩存資料夾
 UPDATE_DIR = Path(TEMP_DIR) / "uploaded_videos"
@@ -58,7 +58,7 @@ def google_video_update() -> Optional[Path]:
     clean_folder(UPDATE_DIR, max_items=10, max_age_days=5)
 
     st.subheader("🎞️ 從 Google Drive 分享連結下載影片")
-    hint = "貼上 Google Drive 分享連結 或 直接貼 FILE_ID 範例 https://drive.google.com/file/d/1jmK_i5AvezX6fCAZLhTrxm0dUnI3KLQT/view?usp=drive_link"
+    hint = "貼上 Google Drive 分享連結 範例 https://drive.google.com/file/d/1jmK_i5AvezX6fCAZLhTrxm0dUnI3KLQT/view?usp=drive_link"
     url_input = st.text_area(
         "Drive 分享連結 或 file id",
         placeholder=hint,

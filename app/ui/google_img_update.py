@@ -70,7 +70,7 @@ def google_img_update() -> Optional[List[Path]]:
     clean_folder(UPDATE_DIR, max_items=500, max_age_days=5)
 
     st.subheader("🎞️ 從 Google Drive 分享連結下載圖片")
-    hint = "貼上 Google Drive 分享連結 或 直接貼 FILE_ID 範例 https://drive.google.com/drive/folders/1ppSMdn1YYdc8rN56uKgWJhqezzneajAY?usp=drive_link"
+    hint = "貼上 Google Drive 分享連結 範例 https://drive.google.com/drive/folders/1ppSMdn1YYdc8rN56uKgWJhqezzneajAY?usp=drive_link"
     
     url_input = st.text_area(
         "Drive 分享連結 或 file id",
