@@ -13,6 +13,14 @@ COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.yml}
 PROJECT_NAME=${PROJECT_NAME:-vessel_measure}
 SERVICE=${SERVICE:-vessel}
 
+
+HOST_UID=${HOST_UID:-1234}
+HOST_GID=${HOST_GID:-1234}
+if [ -z "${HOST_UID}" ]; then HOST_UID=$(id -u); fi
+if [ -z "${HOST_GID}" ]; then HOST_GID=$(id -g); fi
+
+export HOST_UID HOST_GID
+
 # --------------------------------------------------------------------
 # Prerequisite checks
 # --------------------------------------------------------------------

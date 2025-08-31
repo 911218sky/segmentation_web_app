@@ -11,6 +11,13 @@ DOCKERFILE=${DOCKERFILE:-Dockerfile}
 BUILD_CACHE=${BUILD_CACHE:-true}
 USE_REMOTE=${USE_REMOTE:-false}
 
+HOST_UID=${HOST_UID:-1234}
+HOST_GID=${HOST_GID:-1234}
+if [ -z "${HOST_UID}" ]; then HOST_UID=$(id -u); fi
+if [ -z "${HOST_GID}" ]; then HOST_GID=$(id -g); fi
+
+export HOST_UID HOST_GID
+
 # ANSI colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -74,10 +81,10 @@ if [ -n "${PLATFORMS}" ]; then
   echo -e "${BLUE}🔧 Building multi-platform image: ${PLATFORMS}${NC}"
   # Use buildx. We use --load to load into local docker (works if platforms includes local platform).
   # For pushing to registry, user can replace --load with --push manually or set a PUSH env and we can extend.
-  BUILD_CMD=(docker buildx build --load ${NO_CACHE_FLAG} --platform "${PLATFORMS}" --tag "${IMAGE}" -f "${DOCKERFILE}" .)
+  BUILD_CMD=(docker buildx build --load ${NO_CACHE_FLAG} --platform "${PLATFORMS}" --tag "${IMAGE}" -f "${DOCKERFILE}" --build-arg USER_ID="${HOST_UID}" --build-arg GROUP_ID="${HOST_GID}" .)
 else
   echo -e "${BLUE}🔧 Building local image via docker compose (service=${SERVICE})${NC}"
-  BUILD_CMD=(docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" build ${NO_CACHE_FLAG} "${SERVICE}")
+  BUILD_CMD=(docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" build ${NO_CACHE_FLAG} --build-arg USER_ID="${HOST_UID}" --build-arg GROUP_ID="${HOST_GID}" "${SERVICE}")
 fi
 
 # Print and run
