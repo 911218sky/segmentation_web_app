@@ -38,6 +38,8 @@ IMAGE_COMPRESSOR = True
 
 # 儲存設定到瀏覽器的 key
 STORAGE_KEY = "vessel_saved_configs"
+# 持久化目前設定名稱
+CURRENT_CONFIG_NAME = "current_config_name"
 
 # 模型配置
 YOLO_CONFIG = {

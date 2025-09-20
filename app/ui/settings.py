@@ -9,6 +9,8 @@ from config import (
     get_text,
     # model
     switch_model,
+    # config
+    CURRENT_CONFIG_NAME,
 )
 
 def settings_section():
@@ -18,12 +20,14 @@ def settings_section():
     # 載入所有可用設定
     available_configs = file_storage_manager.load_saved_configs()
     config_names = list(available_configs.keys())
+    current_config_name = file_storage_manager.get_current_config_name()
     current_config = file_storage_manager.get_current_config()
     current_model = current_config.get('selected_model', DEFAULT_MODEL)
 
-    selected_config = st.selectbox(
+    selected_config_name = st.selectbox(
         get_text('select_config'),
         options=config_names,
+        index=config_names.index(current_config_name) if current_config_name else 0,
         help=get_text('select_config_help')
     )
 
@@ -31,28 +35,32 @@ def settings_section():
     # 套用設定按鈕
     with col1:
         if st.button(get_text('apply_config'), type="primary"):
-            if selected_config in available_configs:
-                new_config = available_configs[selected_config]
+            if selected_config_name in available_configs:
+                new_config = available_configs[selected_config_name]
                 # 檢查是否需要切換模型
                 config_model = new_config.get('selected_model')
                 model_changed = config_model and config_model != current_model
                 # 套用設定
                 file_storage_manager.apply_config(new_config)
+                # 保存目前設定
+                file_storage_manager.save_config_to_file(selected_config_name, new_config)
+                # 保存目前設定名稱
+                file_storage_manager.save_data(CURRENT_CONFIG_NAME, selected_config_name)
                 # 只有在模型改變時才切換模型並 rerun
                 if model_changed:
                     switch_model(config_model)
-                    st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
+                    st.success(f"✅ {get_text('config_applied')}「{selected_config_name}」設定")
                     st.rerun()
                 else:
-                    st.success(f"✅ {get_text('config_applied')}「{selected_config}」設定")
+                    st.success(f"✅ {get_text('config_applied')}「{selected_config_name}」設定")
 
     # 刪除設定按鈕
     with col2:
-        can_delete = selected_config not in DEFAULT_CONFIGS
+        can_delete = selected_config_name not in DEFAULT_CONFIGS
         if st.button(get_text('delete_config'), disabled=not can_delete):
             if can_delete:
-                if file_storage_manager.delete_config_from_browser(selected_config):
-                    st.success(f"✅ {get_text('config_deleted')}「{selected_config}」設定")
+                if file_storage_manager.delete_config_from_file(selected_config_name):
+                    st.success(f"✅ {get_text('config_deleted')}「{selected_config_name}」設定")
                     st.rerun()
                 else:
                     st.error(get_text('delete_failed'))
@@ -73,7 +81,7 @@ def settings_section():
     if st.button(get_text('save_config')):
         if new_config_name:
             current_config = file_storage_manager.get_current_config()
-            if file_storage_manager.save_config_to_browser(new_config_name, current_config):
+            if file_storage_manager.save_config_to_file(new_config_name, current_config):
                 st.success(f"✅ 設定「{new_config_name}」{get_text('config_saved')}")
                 st.rerun()
             else:

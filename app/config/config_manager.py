@@ -1,6 +1,13 @@
 import json
+from typing import Any
 import streamlit as st
-from .config import DEFAULT_CONFIGS, STORAGE_KEY, STORAGE_DIR, CONFIG_FILE
+from .config import (
+    DEFAULT_CONFIGS,
+    STORAGE_KEY,
+    STORAGE_DIR,
+    CONFIG_FILE,
+    CURRENT_CONFIG_NAME,
+)
 
 class FileStorageManager:
     """檔案存儲管理器，負責處理配置的持久化存儲"""
@@ -90,7 +97,13 @@ class FileStorageManager:
                 pass
             return self.default_configs.copy()
     
-    def save_config_to_browser(self, config_name, config):
+    def save_data(self, key: str, value: Any):
+        """儲存目前設定名稱"""
+        data_to_save = self._read_config_file()
+        data_to_save[key] = value
+        return self._write_config_file(data_to_save)
+    
+    def save_config_to_file(self, config_name: str, config: dict):
         """儲存設定到檔案"""
         try:
             # 載入現有配置
@@ -110,7 +123,7 @@ class FileStorageManager:
             st.error(f"儲存設定失敗: {str(e)}")
             return False
     
-    def delete_config_from_browser(self, config_name):
+    def delete_config_from_file(self, config_name: str):
         """從檔案刪除設定"""
         try:
             if config_name in self.default_configs:
@@ -134,15 +147,20 @@ class FileStorageManager:
             st.error(f"刪除設定失敗: {str(e)}")
             return False
     
-    @staticmethod
-    def apply_config(config):
+    def apply_config(self, config):
         """套用配置到控件"""
         for key, value in config.items():
             st.session_state[key] = value
     
-    @staticmethod
-    def get_current_config():
+    def get_current_config(self):
         """獲取當前的配置參數"""
-        default_config = DEFAULT_CONFIGS["系統預設"]
+        current_config_name = self.get_current_config_name()
+        if current_config_name is None:
+            return DEFAULT_CONFIGS["系統預設"]
+        current_config = self.load_saved_configs()[current_config_name]
         session_dict = dict(st.session_state)
-        return {key: session_dict.get(key, default) for key, default in default_config.items()}
+        return {key: session_dict.get(key, default) for key, default in current_config.items()}
+
+    def get_current_config_name(self):
+        """獲取當前的設定名稱"""
+        return self._read_config_file().get(CURRENT_CONFIG_NAME, None)

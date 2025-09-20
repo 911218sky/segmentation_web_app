@@ -18,7 +18,8 @@ from .config import (
     SA_FILE,
     VIDEO_COMPRESSOR,
     IMAGE_COMPRESSOR,
-)
+    CURRENT_CONFIG_NAME,
+)   
 
 from .config_manager import (
     FileStorageManager
@@ -62,6 +63,7 @@ __all__ = [
     "SA_FILE",
     "VIDEO_COMPRESSOR",
     "IMAGE_COMPRESSOR",
+    "CURRENT_CONFIG_NAME",
     
     # from page
     "PAGES",
