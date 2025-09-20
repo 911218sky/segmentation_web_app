@@ -103,6 +103,12 @@ class FileStorageManager:
         data_to_save[key] = value
         return self._write_config_file(data_to_save)
     
+    def delete_data(self, key: str):
+        """刪除目前設定名稱"""
+        data_to_save = self._read_config_file()
+        del data_to_save[key]
+        return self._write_config_file(data_to_save)
+    
     def save_config_to_file(self, config_name: str, config: dict):
         """儲存設定到檔案"""
         try:
@@ -157,9 +163,20 @@ class FileStorageManager:
         current_config_name = self.get_current_config_name()
         if current_config_name is None:
             return DEFAULT_CONFIGS["系統預設"]
-        current_config = self.load_saved_configs()[current_config_name]
+        
+        current_config = self.load_saved_configs().get(current_config_name, None)
+        if not current_config:
+            # 刪除不存在的設定
+            self.delete_data(CURRENT_CONFIG_NAME)
+            return DEFAULT_CONFIGS["系統預設"]
+        
         session_dict = dict(st.session_state)
-        return {key: session_dict.get(key, default) for key, default in current_config.items()}
+        
+        # 獲取目前設定，優先使用 current_config 的數值，沒有則使用 session_dict 的數值
+        for key, default in current_config.items():
+            session_dict[key] = default
+        
+        return session_dict
 
     def get_current_config_name(self):
         """獲取當前的設定名稱"""
