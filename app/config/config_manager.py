@@ -1,6 +1,11 @@
 import json
+import os
+import tempfile
 from typing import Any
+
 import streamlit as st
+from filelock import FileLock
+
 from .config import (
     DEFAULT_CONFIGS,
     STORAGE_KEY,
@@ -8,7 +13,6 @@ from .config import (
     CONFIG_FILE,
     CURRENT_CONFIG_NAME,
 )
-
 class FileStorageManager:
     """檔案存儲管理器，負責處理配置的持久化存儲"""
     
@@ -18,6 +22,8 @@ class FileStorageManager:
         self.config_file = CONFIG_FILE
         self.storage_key = STORAGE_KEY
         self.default_configs = DEFAULT_CONFIGS
+        
+        self._lock = FileLock(str(self.config_file) + ".lock", timeout=5)
     
     def _ensure_storage_dir(self):
         """確保存儲目錄存在"""
@@ -44,9 +50,14 @@ class FileStorageManager:
         try:
             if not self._ensure_storage_dir():
                 return False
-                
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            with self._lock:
+                dirpath = str(self.storage_dir)
+                with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=dirpath, delete=False) as tmp:
+                    json.dump(data, tmp, ensure_ascii=False, indent=2)
+                    tmp.flush()
+                    os.fsync(tmp.fileno())
+                    tmp_name = tmp.name
+                os.replace(tmp_name, self.config_file)
             return True
         except Exception as e:
             st.error(f"寫入配置檔案失敗: {str(e)}")
