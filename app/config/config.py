@@ -40,6 +40,8 @@ IMAGE_COMPRESSOR = True
 STORAGE_KEY = "vessel_saved_configs"
 # 持久化目前設定名稱
 CURRENT_CONFIG_NAME = "current_config_name"
+# 圖片上傳快取 key
+IMAGE_UPLOAD_SESSION_KEY = "image_uploader_cache"
 
 # 模型配置
 YOLO_CONFIG = {

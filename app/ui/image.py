@@ -10,29 +10,80 @@ from config import (
     BATCH_SIZE,
     # page config
     switch_page,
+    # ui config
+    IMAGE_UPLOAD_SESSION_KEY,
 )
 from ui import canvas
 from utils.excel import generate_excel_img_results
 from processing import process_batch_images
 from utils.canvas import FileLike
 
+def _serialize_uploaded_files(files: List[UploadedFile]) -> List[Dict[str, Any]]:
+    """將 Streamlit 的 UploadedFile 物件轉換成可放入 session 的一般資料結構。"""
+    serialized: List[Dict[str, Any]] = []
+    for upload in files:
+        if upload is None:
+            continue
+        try:
+            data = upload.getvalue()
+        except Exception:
+            # 如果檔案臨時存放位置已失效則略過
+            continue
+        serialized.append({
+            "name": upload.name,
+            "type": upload.type,
+            "data": data,
+        })
+    return serialized
+
+def _deserialize_uploaded_files(serialized: List[Dict[str, Any]]) -> List[FileLike]:
+    """從序列化的資料還原成可供讀取的 file-like 物件。"""
+    buffers: List[FileLike] = []
+    for item in serialized:
+        data = item.get("data")
+        if data is None:
+            continue
+        buffer = BytesIO(data)
+        buffer.name = item.get("name", "uploaded_image")
+        buffer.seek(0)
+        buffers.append(buffer)
+    return buffers
+
 # 上傳區
-def upload_images(cache: bool = True) -> List[UploadedFile]:
-    if cache and st.session_state.get("image_uploader"):
-        return st.session_state.image_uploader
-    
-    if not cache or not st.session_state.get("image_uploader"):
-        st.session_state.image_uploader = st.file_uploader(
-            "選擇多張圖片", type=['png','jpg','jpeg','bmp','tiff'],
-            accept_multiple_files=True,
-        )
-    
+def upload_images(cache: bool = True) -> List[FileLike]:
+    # 移除舊版存放於 session_state 的 UploadedFile
+    if "image_uploader" in st.session_state:
+        st.session_state.pop("image_uploader", None)
+
+    uploads = st.file_uploader(
+        "選擇多張圖片",
+        type=['png', 'jpg', 'jpeg', 'bmp', 'tiff'],
+        accept_multiple_files=True,
+    )
+
+    # 若本次有新的上傳檔案，立即序列化並存入 session_state
+    new_serialized = None
+    if uploads:
+        new_serialized = _serialize_uploaded_files(uploads)
+        st.session_state[IMAGE_UPLOAD_SESSION_KEY] = new_serialized
+
+    # 根據 cache 參數決定要使用本次上傳或既有快取，並還原成可讀取的 file-like 物件
+    files_to_use: List[FileLike] = []
+    if cache:
+        serialized = new_serialized if new_serialized is not None else st.session_state.get(IMAGE_UPLOAD_SESSION_KEY, [])
+        files_to_use = _deserialize_uploaded_files(serialized)
+    elif new_serialized is not None:
+        files_to_use = _deserialize_uploaded_files(new_serialized)
+
+    # 使用者可點擊清除按鈕來移除快取並重新整理頁面
     show_clear_button = st.button("🗑️ 清空圖片")
     if show_clear_button:
-        st.session_state.image_uploader = []
+        st.session_state.pop(IMAGE_UPLOAD_SESSION_KEY, None)
+        files_to_use = []
         st.rerun()
 
-    return st.session_state.image_uploader
+    # 回傳實際可供後續處理的檔案串列
+    return files_to_use
 
 # 處理按鈕
 def handle_image_processing(
@@ -79,7 +130,7 @@ def handle_image_processing(
 
     if col2.button("🗑️ 清空圖片結果"):
         st.session_state.img_results = []
-        st.session_state.image_uploader = []
+        st.session_state.pop(IMAGE_UPLOAD_SESSION_KEY, None)
         st.rerun()
 
 def image_results():

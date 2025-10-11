@@ -65,6 +65,10 @@ def main():
         model_section()
         settings_section()
         params = parameters_section()
+
+    def on_nav_change():
+        selected = st.session_state.active_page_control
+        st.session_state.active_page = selected
     
     page = st.segmented_control(
         label="🔖 功能",
@@ -72,7 +76,9 @@ def main():
         format_func=lambda x: PAGES[x],
         default=st.session_state.active_page,
         key="active_page_control",
+        selection_mode="single",
         width="stretch",
+        on_change=on_nav_change,
     )
     
     if page == "images":
@@ -93,6 +99,6 @@ def main():
         with sub[1]:
             video_downloads()
             video_results()
-
+            
 if __name__ == "__main__":
     main()

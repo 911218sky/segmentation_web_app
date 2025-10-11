@@ -19,6 +19,7 @@ from .config import (
     VIDEO_COMPRESSOR,
     IMAGE_COMPRESSOR,
     CURRENT_CONFIG_NAME,
+    IMAGE_UPLOAD_SESSION_KEY,
 )   
 
 from .config_manager import (
@@ -64,7 +65,7 @@ __all__ = [
     "VIDEO_COMPRESSOR",
     "IMAGE_COMPRESSOR",
     "CURRENT_CONFIG_NAME",
-    
+    "IMAGE_UPLOAD_SESSION_KEY",
     # from page
     "PAGES",
     "switch_page",

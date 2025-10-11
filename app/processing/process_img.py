@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 from typing import List, Tuple, Union, Optional, Dict, Any
 from PIL import Image

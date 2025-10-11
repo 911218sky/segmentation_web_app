@@ -214,7 +214,6 @@ class DriveFetcher:
             out.parent.mkdir(parents=True, exist_ok=True)
         return out
 
-
     def _download(self, file_id: str, dest: Path, export_mime: Optional[str] = None) -> Optional[str]:
         """
         這個方法會在各執行緒中被呼叫。
