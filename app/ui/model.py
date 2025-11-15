@@ -27,14 +27,18 @@ def model_section():
         key='model_selector',
         help=get_text('select_model_help')
     )
-
-    # 顯示當前模型資訊
-    if current_config:
-        st.info(f"{get_text('current_model')}: {current_model}")
-
+    
     # 模型切換按鈕
     if st.button(get_text('switch_model'), type="secondary"):
         switch_model(selected_model)
+ 
+    # 如果選擇了模型，則更新當前模型
+    if selected_model is not None:
+        current_model = selected_model
+        
+    # 顯示當前模型資訊
+    if current_config:
+        st.info(f"{get_text('current_model')}: {current_model}")
 
     # 自動載入預設模型（如果還沒載入）
     if st.session_state.predictor is None:

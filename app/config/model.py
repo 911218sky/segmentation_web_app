@@ -14,18 +14,18 @@ def load_model(model_name):
     """載入並快取 YOLO 模型"""
     try:
         weights_path = get_model_path(model_name)
-        
         if not weights_path.exists():
             st.error(f"模型檔案不存在: {weights_path}")
             return None, None
         predictor = YOLOPredictor(weights_path)
+        print("成功載入模型", weights_path)
         return predictor, model_name
     except Exception as e:
         st.error(f"模型載入失敗: {str(e)}")
         return None, None
 
 @st.cache_resource
-def switch_model(new_model_name):
+def switch_model(new_model_name) -> bool:
     """切換模型"""
     if new_model_name != st.session_state.get('current_model_name'):
         # 清除快取並重新載入模型
@@ -42,3 +42,5 @@ def switch_model(new_model_name):
                 st.rerun()
             else:
                 st.error(f"❌ 模型載入失敗: {new_model_name}")
+                return False
+    return True

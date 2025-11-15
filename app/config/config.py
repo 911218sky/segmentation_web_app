@@ -17,11 +17,12 @@ CONFIG_FILE = STORAGE_DIR / "saved_configs.json"
 AVAILABLE_MODELS = {
     "v1.0": "best.pt",
     "v3.0 (alpha)": "best_v3_alpha.pt",
-    "v3.0 (beta) new": "best_v3_beta.pt",
+    "v3.0 (beta)": "best_v3_beta.pt",
+    "v4.0 (alpha)": "best_v4_alpha.pt",
 }
 
 # 預設模型
-DEFAULT_MODEL = "v3.0 (beta) new"
+DEFAULT_MODEL = "v4.0 (alpha)"
 
 # 批次處理大小
 BATCH_SIZE = 32 * 3
