@@ -98,8 +98,8 @@ pip install -r requirements_yolo.txt
 # Install application dependencies
 pip install -r requirements.txt
 
-# Install YOLOv12 in development mode
-cd ./yolov12
+# Install YOLOv13 in development mode
+cd ./yolov13
 pip install -e .
 cd ..
 ```
