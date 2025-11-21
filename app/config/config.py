@@ -18,7 +18,7 @@ AVAILABLE_MODELS = {
     "v1.0": "best.pt",
     "v3.0 (alpha)": "best_v3_alpha.pt",
     "v3.0 (beta)": "best_v3_beta.pt",
-    "v4.0 (alpha)": "best_v4_alpha.pt",
+    "v4.0 (beta)": "best_v4_beta.pt",
 }
 
 # 預設模型

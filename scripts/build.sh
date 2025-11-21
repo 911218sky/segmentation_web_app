@@ -10,6 +10,7 @@ PLATFORMS=${PLATFORMS:-}
 DOCKERFILE=${DOCKERFILE:-Dockerfile}
 BUILD_CACHE=${BUILD_CACHE:-true}
 USE_REMOTE=${USE_REMOTE:-false}
+PUSH=${PUSH:-false}
 
 HOST_UID=${HOST_UID:-1234}
 HOST_GID=${HOST_GID:-1234}
@@ -78,19 +79,36 @@ fi
 
 # Build command selection
 if [ -n "${PLATFORMS}" ]; then
-  echo -e "${BLUE}🔧 Building multi-platform image: ${PLATFORMS}${NC}"
-  # Use buildx. We use --load to load into local docker (works if platforms includes local platform).
-  # For pushing to registry, user can replace --load with --push manually or set a PUSH env and we can extend.
-  BUILD_CMD=(docker buildx build --load ${NO_CACHE_FLAG} --platform "${PLATFORMS}" --tag "${IMAGE}" -f "${DOCKERFILE}" --build-arg USER_ID="${HOST_UID}" --build-arg GROUP_ID="${HOST_GID}" .)
+  # Determine Buildx output mode: use --push if PUSH=true, otherwise use --load (load to local docker)
+  OUTPUT_FLAG="--load"
+  if [ "${PUSH}" = "true" ]; then
+    OUTPUT_FLAG="--push"
+  fi
+
+  echo -e "${BLUE}🔧 Building multi-platform image: ${PLATFORMS} (Output: ${OUTPUT_FLAG})${NC}"
+  
+  BUILD_CMD=(docker buildx build ${OUTPUT_FLAG} ${NO_CACHE_FLAG} --platform "${PLATFORMS}" --tag "${IMAGE}" -f "${DOCKERFILE}" --build-arg USER_ID="${HOST_UID}" --build-arg GROUP_ID="${HOST_GID}" .)
 else
   echo -e "${BLUE}🔧 Building local image via docker compose (service=${SERVICE})${NC}"
   BUILD_CMD=(docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" build ${NO_CACHE_FLAG} --build-arg USER_ID="${HOST_UID}" --build-arg GROUP_ID="${HOST_GID}" "${SERVICE}")
 fi
 
-# Print and run
+# Print and run build command
 echo -e "${BLUE}>> ${BUILD_CMD[*]}${NC}"
 if "${BUILD_CMD[@]}"; then
   echo -e "${GREEN}✅ Build succeeded: ${IMAGE}${NC}"
+
+  # (If Buildx mode is used with PUSH=true, the command above already included --push)
+  if [ "${PUSH}" = "true" ] && [ -z "${PLATFORMS}" ]; then
+    echo -e "${BLUE}🚀 Pushing image to registry...${NC}"
+    if docker push "${IMAGE}"; then
+      echo -e "${GREEN}✅ Push succeeded${NC}"
+    else
+      echo -e "${RED}❌ Push failed${NC}"
+      exit 1
+    fi
+  fi
+
 else
   echo -e "${RED}❌ Build failed${NC}"
   exit 1

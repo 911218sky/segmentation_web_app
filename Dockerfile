@@ -16,7 +16,7 @@ WORKDIR /app
 # 複製檔案（先複製 requirements 等）
 COPY requirements.txt requirements_yolo.txt ./
 COPY wheels ./wheels
-COPY yolov12 ./yolov12
+COPY yolov13 ./yolov13
 COPY scripts ./scripts
 
 # 安裝系統依賴、Python 套件、安裝 yolov12，然後移除 build-time 套件與清理暫存
