@@ -51,6 +51,13 @@ def _deserialize_uploaded_files(serialized: List[Dict[str, Any]]) -> List[FileLi
         buffers.append(buffer)
     return buffers
 
+def _image_to_bytes(image: Image.Image, fmt: str = "JPEG") -> BytesIO:
+    """Convert a PIL image to a BytesIO buffer for downloads."""
+    buffer = BytesIO()
+    image.save(buffer, format=fmt)
+    buffer.seek(0)
+    return buffer
+
 # 上傳區
 def upload_images(cache: bool = True) -> List[FileLike]:
     # 移除舊版存放於 session_state 的 UploadedFile
@@ -172,6 +179,14 @@ def image_results():
                             st.metric(get_text('std_length'), f"{stats['std_length']:.2f} mm")
                             st.metric(get_text('max_length'), f"{stats['max_length']:.2f} mm")
                             st.metric(get_text('min_length'), f"{stats['min_length']:.2f} mm")
+                    img_buffer = _image_to_bytes(r['result'])
+                    st.download_button(
+                        get_text('download_single_image'),
+                        img_buffer.getvalue(),
+                        f"{r['filename']}.jpg",
+                        "image/jpeg",
+                        key=f"download_single_image_{i}_{r['filename']}",
+                    )
 
     # 處理失敗結果
     if fail:
@@ -188,9 +203,8 @@ def image_downloads():
     buf_zip = BytesIO()
     with zipfile.ZipFile(buf_zip, 'w') as zf:
         for r in imgs:
-            b = BytesIO()
-            r['result'].save(b, format='JPEG')
-            zf.writestr(f"images/{r['filename']}.jpg", b.getvalue())
+            img_buffer = _image_to_bytes(r['result'])
+            zf.writestr(f"images/{r['filename']}.jpg", img_buffer.getvalue())
         zf.writestr("image_results.xlsx", buf_xl.getvalue())
 
     col1, col2 = st.columns(2)
