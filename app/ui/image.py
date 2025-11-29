@@ -12,6 +12,8 @@ from config import (
     switch_page,
     # ui config
     IMAGE_UPLOAD_SESSION_KEY,
+    # language
+    get_text,
 )
 from ui import canvas
 from utils.excel import generate_excel_img_results
@@ -56,7 +58,7 @@ def upload_images(cache: bool = True) -> List[FileLike]:
         st.session_state.pop("image_uploader", None)
 
     uploads = st.file_uploader(
-        "選擇多張圖片",
+        get_text('select_images_upload'),
         type=['png', 'jpg', 'jpeg', 'bmp', 'tiff'],
         accept_multiple_files=True,
     )
@@ -76,7 +78,7 @@ def upload_images(cache: bool = True) -> List[FileLike]:
         files_to_use = _deserialize_uploaded_files(new_serialized)
 
     # 使用者可點擊清除按鈕來移除快取並重新整理頁面
-    show_clear_button = st.button("🗑️ 清空圖片")
+    show_clear_button = st.button(get_text('clear_images'))
     if show_clear_button:
         st.session_state.pop(IMAGE_UPLOAD_SESSION_KEY, None)
         files_to_use = []
@@ -99,11 +101,11 @@ def handle_image_processing(
         region = canvas(uploads[0])
     
     col1, col2 = st.columns(2)
-    if col1.button("📤 開始批量處理圖片"):
+    if col1.button(get_text('start_image_batch_processing')):
         imgs = [(f.name, Image.open(f)) for f in uploads]
         progress = st.progress(0)
         total_batches = math.ceil(len(imgs)/BATCH_SIZE)
-        st.info(f"共 {len(imgs)} 張，分 {total_batches} 批處理")
+        st.info(get_text('batch_processing_summary').format(count=len(imgs), batches=total_batches))
         results = process_batch_images(
             predictor=st.session_state.predictor,
             images=imgs,
@@ -125,10 +127,10 @@ def handle_image_processing(
         )
         st.session_state.img_results = results
         progress.progress(1.0)
-        st.success("✅ 圖片處理完成")
+        st.success(get_text('image_processing_complete'))
         switch_page("results")
 
-    if col2.button("🗑️ 清空圖片結果"):
+    if col2.button(get_text('clear_image_results')):
         st.session_state.img_results = []
         st.session_state.pop(IMAGE_UPLOAD_SESSION_KEY, None)
         st.rerun()
@@ -136,14 +138,14 @@ def handle_image_processing(
 def image_results():
     res = st.session_state.img_results
     if not res:
-        st.info("尚無圖片處理結果")
+        st.info(get_text('no_image_results'))
         return
 
-    st.subheader("📷 圖片處理結果")
+    st.subheader(get_text('image_results_title'))
     succ = [r for r in res if r['success']]
     fail = [r for r in res if not r['success']]
 
-    st.markdown(f"**成功：{len(succ)}/{len(res)} 張**")
+    st.markdown(get_text('image_success_ratio').format(success=len(succ), total=len(res)))
 
     if succ:
         cols_per_row = 2
@@ -159,21 +161,21 @@ def image_results():
                     # 圖片 + 標題
                     st.image(r['result'], caption=r['filename'], use_container_width=True)
                     # 統計數據放在 expander，預設收合
-                    with st.expander("🔍 查看統計數據", expanded=True):
+                    with st.expander(get_text('view_stats'), expanded=True):
                         stats = r['stats']
                         c1, c2 = st.columns(2)
                         with c1:
-                            st.metric("信心度", f"{stats['confidence']:.3f}")
-                            st.metric("線條數", f"{stats['num_lines']}")
-                            st.metric("平均長度", f"{stats['mean_length']:.2f} mm")
+                            st.metric(get_text('confidence'), f"{stats['confidence']:.3f}")
+                            st.metric(get_text('num_lines'), f"{stats['num_lines']}")
+                            st.metric(get_text('mean_length'), f"{stats['mean_length']:.2f} mm")
                         with c2:
-                            st.metric("長度標準差", f"{stats['std_length']:.2f} mm")
-                            st.metric("最大長度", f"{stats['max_length']:.2f} mm")
-                            st.metric("最小長度", f"{stats['min_length']:.2f} mm")
+                            st.metric(get_text('std_length'), f"{stats['std_length']:.2f} mm")
+                            st.metric(get_text('max_length'), f"{stats['max_length']:.2f} mm")
+                            st.metric(get_text('min_length'), f"{stats['min_length']:.2f} mm")
 
     # 處理失敗結果
     if fail:
-        st.warning(f"⚠️ {len(fail)} 張處理失敗")
+        st.warning(get_text('image_processing_failed_count').format(count=len(fail)))
 
 # 下載區
 def image_downloads():
@@ -181,7 +183,7 @@ def image_downloads():
     if not imgs:
         return
 
-    st.subheader("💾 下載處理結果")
+    st.subheader(get_text('download_results'))
     buf_xl = generate_excel_img_results(st.session_state.img_results)
     buf_zip = BytesIO()
     with zipfile.ZipFile(buf_zip, 'w') as zf:
@@ -192,7 +194,7 @@ def image_downloads():
         zf.writestr("image_results.xlsx", buf_xl.getvalue())
 
     col1, col2 = st.columns(2)
-    col1.download_button("下載 ZIP", buf_zip.getvalue(), "image_results.zip", "application/zip")
-    col2.download_button("下載 Excel", buf_xl.getvalue(),
+    col1.download_button(get_text('download_zip'), buf_zip.getvalue(), "image_results.zip", "application/zip")
+    col2.download_button(get_text('download_excel'), buf_xl.getvalue(),
                          "image_results.xlsx",
                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

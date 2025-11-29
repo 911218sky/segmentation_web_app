@@ -4,6 +4,8 @@ from config import (
     file_storage_manager,
     # page config
     PAGES,
+    # language
+    get_text,
 )
 from ui import (
     model_section, 
@@ -69,18 +71,18 @@ def main():
     def on_nav_change():
         selected = st.session_state.active_page_control
         st.session_state.active_page = selected
-    
+
     page = st.segmented_control(
-        label="🔖 功能",
+        label=get_text('nav_label'),
         options=PAGES.keys(),
-        format_func=lambda x: PAGES[x],
+        format_func=lambda x: get_text(PAGES[x]),
         default=st.session_state.active_page,
         key="active_page_control",
         selection_mode="single",
         width="stretch",
         on_change=on_nav_change,
     )
-    
+
     if page == "images":
         uploads_imgs = upload_images()
         if not uploads_imgs:
@@ -92,7 +94,10 @@ def main():
         if video_path:
             handle_video_processing(video_path, params)
     elif page == "results":
-        sub = st.tabs(["📷 圖片結果", "🎞️ 影片結果"])
+        sub = st.tabs([
+            get_text('results_tab_images'),
+            get_text('results_tab_videos'),
+        ])
         with sub[0]:
             image_downloads()
             image_results()

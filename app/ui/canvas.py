@@ -82,11 +82,11 @@ def canvas(
     # 處理圖片（resized 輸出用於 canvas 背景）
     resized_img, orig_size, canvas_size = process_image_for_canvas(uploaded_file)
 
-    st.markdown("**調整選取區域尺寸**")
+    st.markdown(f"**{get_text('canvas_adjust_selection')}**")
     col1, col2 = st.columns(2)
     with col1:
         fixed_width: int = st.number_input(
-            "寬度 (px)",
+            get_text('canvas_width_label'),
             min_value=10,
             max_value=orig_size[0],
             step=10,
@@ -96,7 +96,7 @@ def canvas(
 
     with col2:
         fixed_height: int = st.number_input(
-            "高度 (px)",
+            get_text('canvas_height_label'),
             min_value=10,
             max_value=orig_size[1],
             step=10,
@@ -187,11 +187,12 @@ def canvas(
 
                 region = (x, y, w, h)
 
-        st.info(get_text("interactive_selection_help") + f" (目前選擇區域: {region})")
+        region_text = get_text('canvas_region_status').format(region=region)
+        st.info(f"{get_text('interactive_selection_help')} ({region_text})")
 
-        submitted = st.form_submit_button("套用選區")
+        submitted = st.form_submit_button(get_text('canvas_apply_region_button'))
         
         if submitted:
-            st.success("選區已儲存")
+            st.success(get_text('canvas_selection_saved'))
         
     return region

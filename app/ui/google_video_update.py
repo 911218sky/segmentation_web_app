@@ -4,7 +4,7 @@ import streamlit as st
 import re
 
 from utils.file import clean_folder
-from config import TEMP_DIR, SA_FILE, VIDEO_COMPRESSOR
+from config import TEMP_DIR, SA_FILE, VIDEO_COMPRESSOR, get_text
 from utils.video_compressor import VideoCompressor
 from utils.drive_fetcher import DriveFetcher, DriveFetchResult
 
@@ -57,28 +57,28 @@ def _get_compressed_path(path: Path) -> Path:
 def google_video_update() -> Optional[Path]:
     clean_folder(UPDATE_DIR, max_items=10, max_age_days=5)
 
-    st.subheader("🎞️ 從 Google Drive 分享連結下載影片")
-    hint = "貼上 Google Drive 分享連結 範例 https://drive.google.com/file/d/1jmK_i5AvezX6fCAZLhTrxm0dUnI3KLQT/view?usp=drive_link"
+    st.subheader(get_text('google_video_download_subtitle'))
+    hint = get_text('google_drive_link_hint_videos')
     url_input = st.text_area(
-        "Drive 分享連結 或 file id",
+        get_text('google_drive_link_label'),
         placeholder=hint,
         key="drive_video_url_input",
         height=100,
     )
 
-    download_btn = st.button("獲取影片", key="download_video_btn")
-    st.info("請輸入 Google Drive 分享連結然後按獲取影片 範例 https://drive.google.com/file/d/1jmK_i5AvezX6fCAZLhTrxm0dUnI3KLQT/view?usp=drive_link")
+    download_btn = st.button(get_text('google_video_download_button'), key="download_video_btn")
+    st.info(get_text('google_video_info'))
 
     link = url_input.strip()
     if link and not _is_drive_link(link):
-        st.error("請輸入有效的 Google Drive 分享連結或 file id。")
+        st.error(get_text('google_drive_invalid_link'))
         return None
 
     # 檢查連結緩存
     if _get_cache(link):
         result = _get_cache(link)
         if result.path.exists():
-            st.success(f"已使用連結緩存：{result.path.name}")
+            st.success(get_text('google_video_cached').format(name=result.path.name))
             return result.path
 
 
@@ -87,7 +87,7 @@ def google_video_update() -> Optional[Path]:
 
     # 下載新影片
     try:
-        with st.spinner("獲取資料中..."):
+        with st.spinner(get_text('google_fetching_data')):
             results = fetcher.fetch(link, download_dir=UPDATE_DIR, recurse=False, only_list=True)
             # 假如有獲取結果檢查是否有快取
             if results and VIDEO_COMPRESSOR:
@@ -103,33 +103,33 @@ def google_video_update() -> Optional[Path]:
                     return results[0].path
             results = fetcher.fetch(link, download_dir=UPDATE_DIR, recurse=False)
     except Exception as e:
-        st.error(f"下載過程發生錯誤：{e}")
+        st.error(get_text('google_video_download_error').format(error=e))
         return None
 
     if not results:
-        st.error("未找到任何關於影片的檔案或下載失敗，請確認連結或權限設定。")
+        st.error(get_text('google_video_no_results'))
         return None
 
     # 選擇第一個影片
     first = results[0]
     if first.error:
-        st.error(f"下載失敗：{first.error}")
+        st.error(get_text('google_video_fetch_failed').format(error=first.error))
         return None
 
     path = Path(first.path)
     if not path.exists():
-        st.error(f"下載失敗：{path.name} 不存在")
+        st.error(get_text('google_video_path_missing').format(name=path.name))
         return None
 
-    st.success(f"下載完成：{path.name}")
+    st.success(get_text('google_video_download_complete').format(name=path.name))
 
     # 假如超過壓縮影片門檻，壓縮影片
     if first.size > MAX_COMPRESS_SIZE and VIDEO_COMPRESSOR:
         try:
             com_path = _get_compressed_path(path)
-            with st.spinner("壓縮影片中..."):
+            with st.spinner(get_text('google_video_compressing')):
                 compressor.compress(str(path), str(com_path), overwrite=True, quiet=True)
-            st.success(f"壓縮完成：{com_path.name}")
+            st.success(get_text('google_video_compress_complete').format(name=com_path.name))
             # 刪除原檔
             path.unlink()
             # 修改結果路徑

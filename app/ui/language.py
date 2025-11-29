@@ -26,4 +26,3 @@ def language_selector():
     # 如果語言改變，更新 session state 並重新運行
     if language_options[selected_language] != st.session_state.language:
         st.session_state.language = language_options[selected_language]
-        st.rerun()

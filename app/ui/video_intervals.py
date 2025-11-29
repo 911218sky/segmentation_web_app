@@ -3,6 +3,8 @@ import re
 import pandas as pd
 from typing import List, Tuple, Optional
 
+from config import get_text
+
 def _parse_time_to_seconds(t: str) -> float:
     """
     將各種時間字串解析為秒數 (float)。
@@ -22,7 +24,7 @@ def _parse_time_to_seconds(t: str) -> float:
     """
     s = str(t).strip()
     if s == "":
-        raise ValueError("空字串")
+        raise ValueError(get_text('interval_error_empty'))
 
     # 純秒數（整數或浮點數）
     if re.fullmatch(r"\d+(\.\d+)?", s):
@@ -31,13 +33,13 @@ def _parse_time_to_seconds(t: str) -> float:
     # 支援 mm:ss 或 hh:mm:ss（最多三段）
     parts = s.split(':')
     if not 1 < len(parts) <= 3:
-        raise ValueError("時間格式錯誤 (請使用秒數或 mm:ss 或 hh:mm:ss)")
+        raise ValueError(get_text('interval_error_invalid_format'))
 
     # 反序：從秒、分、時做計算
     try:
         parts_num = [float(p) for p in parts[::-1]]
     except Exception:
-        raise ValueError("時間段包含非法數字")
+        raise ValueError(get_text('interval_error_invalid_number'))
 
     seconds = 0.0
     # i=0 -> 秒, i=1 -> 分, i=2 -> 時
@@ -111,41 +113,46 @@ def video_intervals(
     if session_key not in st.session_state:
         st.session_state[session_key] = list(default)
 
-    st.markdown("### ⏱️ 設定影片處理區間（秒）")
-    st.markdown("輸入範例：`75`、`75.5`、`01:15` 或 `0:01:15`")
+    st.markdown(get_text('video_intervals_title'))
+    st.markdown(get_text('video_intervals_hint'))
 
     # 新增區間表單
     c1, c2, c3 = st.columns([1.6, 1.6, 0.6])
     with c1:
-        start_raw = st.text_input("開始 (秒 或 hh:mm:ss)",
-                                    placeholder="例如 75 或 00:01:15",
+        start_raw = st.text_input(get_text('interval_start_label'),
+                                    placeholder=get_text('interval_start_placeholder'),
                                     key=f"{session_key}_start")
     with c2:
-        end_raw = st.text_input("結束 (秒 或 hh:mm:ss)",
-                                placeholder="例如 100 或 00:01:40",
+        end_raw = st.text_input(get_text('interval_end_label'),
+                                placeholder=get_text('interval_end_placeholder'),
                                 key=f"{session_key}_end")
     with c3:
-        add_btn = st.button("➕ 新增區間")
+        add_btn = st.button(get_text('interval_add_button'))
     if add_btn:
         try:
             s = _parse_time_to_seconds(start_raw)
             e = _parse_time_to_seconds(end_raw)
             if e <= s:
-                st.error("結束時間必須大於開始時間。")
+                st.error(get_text('interval_end_after_start'))
             else:
                 st.session_state[session_key].append((s, e))
-                st.success(f"已新增：{_seconds_to_hms(s)} → {_seconds_to_hms(e)} ({s:.2f}s → {e:.2f}s)")
+                st.success(get_text('interval_added').format(
+                    hms_start=_seconds_to_hms(s),
+                    hms_end=_seconds_to_hms(e),
+                    start=s,
+                    end=e
+                ))
         except Exception as ex:
-            st.error(f"解析時間失敗：{ex}")
+            st.error(get_text('interval_parse_failed').format(error=ex))
 
     st.write("---")
-    st.markdown("#### 已加入的區間")
+    st.markdown(get_text('interval_list_title'))
 
     intervals = st.session_state[session_key]
 
     # 若無區間直接顯示提示
     if not intervals:
-        st.info("目前沒有任何區間。請在上方輸入並按「➕ 新增區間」。")
+        st.info(get_text('intervals_empty'))
     else:
         # 建 DataFrame（只建一次）
         df = pd.DataFrame(intervals, columns=["start_s", "end_s"])
@@ -158,39 +165,39 @@ def video_intervals(
         MAX_PER_PAGE = 25
         n = len(df)
         if n <= MAX_PER_PAGE:
-            st.dataframe(df[["label"]].rename(columns={"label": "區間 (點選以選取)"}), use_container_width=True)
+            st.dataframe(df[["label"]].rename(columns={"label": get_text('interval_column_header')}), use_container_width=True)
             display_df = df
             start_idx = 0
         else:
             # 分頁控制
             pages = (n + MAX_PER_PAGE - 1) // MAX_PER_PAGE
-            page = st.number_input("頁面", min_value=1, max_value=pages, value=1, step=1, key=f"{session_key}_page")
+            page = st.number_input(get_text('interval_page_label'), min_value=1, max_value=pages, value=1, step=1, key=f"{session_key}_page")
             start_idx = (page - 1) * MAX_PER_PAGE
             display_df = df.iloc[start_idx:start_idx + MAX_PER_PAGE]
-            st.dataframe(display_df[["label"]].rename(columns={"label": f"區間 (第 {page}/{pages} 頁)"}), use_container_width=True)
+            st.dataframe(display_df[["label"]].rename(columns={"label": get_text('interval_column_header_paged').format(page=page, pages=pages)}), use_container_width=True)
 
         # 用單一 multiselect 來選擇要刪除的項目（減少 per-item buttons）
         options = {f"{start_idx + idx + 1}. {row.label}": start_idx + idx for idx, row in enumerate(display_df.itertuples())}
-        sel = st.multiselect("選取要刪除的區間（可多選）", options=list(options.keys()), key=f"{session_key}_multisel")
-        if st.button("🗑️ 刪除所選", key=f"{session_key}_del_btn"):
+        sel = st.multiselect(get_text('interval_multiselect_label'), options=list(options.keys()), key=f"{session_key}_multisel")
+        if st.button(get_text('delete_selected_intervals'), key=f"{session_key}_del_btn"):
             if not sel:
-                st.warning("請先選擇要刪除的區間。")
+                st.warning(get_text('select_intervals_warning'))
             else:
                 # 計算要保留的 intervals
                 del_indices = set(options[s] for s in sel)
                 new_list = [iv for idx, iv in enumerate(intervals) if idx not in del_indices]
                 st.session_state[session_key] = new_list
-                st.success(f"已刪除 {len(del_indices)} 筆。")
+                st.success(get_text('intervals_deleted').format(count=len(del_indices)))
 
         # 匯出 & 複製用文字顯示（方便一次複製）
         st.write("---")
         cA, cB = st.columns([1, 1])
         with cA:
-            if st.button("🔀 合併重疊區間", key=f"{session_key}_merge_btn"):
+            if st.button(get_text('merge_intervals_button'), key=f"{session_key}_merge_btn"):
                 st.session_state[session_key] = _merge_intervals(st.session_state[session_key])
-                st.success("已合併重疊 / 相接的區間。")
+                st.success(get_text('intervals_merged'))
         with cB:
-            if st.button("🧹 清除全部區間", key=f"{session_key}_clear_btn"):
+            if st.button(get_text('clear_intervals'), key=f"{session_key}_clear_btn"):
                 st.session_state[session_key] = []
 
     # 最終回傳

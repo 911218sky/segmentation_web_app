@@ -106,9 +106,11 @@ CANVAS_CONFIG = {
     "max_canvas_h": 600,
 }
 
-# 預設設定組合
+# 預設設定組合 (使用語言無關的 key)
+DEFAULT_CONFIG_KEY = "default"
+
 DEFAULT_CONFIGS = {
-    "系統預設": {
+    DEFAULT_CONFIG_KEY: {
         "selected_model": DEFAULT_MODEL,
         "pixel_size_mm": PROCESSING_CONFIG["pixel_size_mm"],
         "confidence_threshold": YOLO_CONFIG["conf"],
@@ -122,6 +124,6 @@ DEFAULT_CONFIGS = {
         "region_limit": VISUALIZATION_CONFIG["region_limit"],
         "rect_width": CANVAS_CONFIG["rect_width"],
         "rect_height": CANVAS_CONFIG["rect_height"],
-        "line_color_option": "綠色",
+        "line_color_option": "color_green",  # 使用語言無關的 key
     }
 }

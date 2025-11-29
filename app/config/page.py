@@ -1,9 +1,9 @@
 import streamlit as st
 
 PAGES = {
-    "images": "📷 圖片處理",
-    "videos": "🎞️ 影片處理",
-    "results": "✅ 結果與下載"
+    "images": "page_images",
+    "videos": "page_videos",
+    "results": "page_results"
 }
 
 def switch_page(page: str):

@@ -5,7 +5,7 @@ import re
 from PIL import Image
 
 from utils.file import clean_folder
-from config import TEMP_DIR, SA_FILE, IMAGE_COMPRESSOR
+from config import TEMP_DIR, SA_FILE, IMAGE_COMPRESSOR, get_text
 from utils.drive_fetcher import DriveFetcher, DriveFetchResult
 
 # Google Drive URL matcher
@@ -69,29 +69,29 @@ def _compress_with_pillow(
 def google_img_update() -> Optional[List[Path]]:
     clean_folder(UPDATE_DIR, max_items=500, max_age_days=5)
 
-    st.subheader("🎞️ 從 Google Drive 分享連結下載圖片")
-    hint = "貼上 Google Drive 分享連結 範例 https://drive.google.com/drive/folders/1ppSMdn1YYdc8rN56uKgWJhqezzneajAY?usp=drive_link"
+    st.subheader(get_text('google_img_download_subtitle'))
+    hint = get_text('google_drive_link_hint_images')
     
     url_input = st.text_area(
-        "Drive 分享連結 或 file id",
+        get_text('google_drive_link_label'),
         placeholder=hint,
         key="drive_img_url_input",
         height=100,
     )
 
-    download_btn = st.button("獲取圖片", key="download_img_btn")
-    st.info("請輸入 Google Drive 分享連結然後按獲取圖片 範例 https://drive.google.com/drive/folders/1ppSMdn1YYdc8rN56uKgWJhqezzneajAY?usp=drive_link")
+    download_btn = st.button(get_text('google_img_download_button'), key="download_img_btn")
+    st.info(get_text('google_img_info'))
 
     link = url_input.strip()
     if link and not _is_drive_link(link):
-        st.error("請輸入有效的 Google Drive 分享連結或 file id。")
+        st.error(get_text('google_drive_invalid_link'))
         return None
 
     # 檢查連結緩存
     if _get_cache(link):
         result = _get_cache(link)
         if result:
-            st.success(f"已使用連結緩存 共 {len(result)} 張圖片")
+            st.success(get_text('google_img_cache_used').format(count=len(result)))
             return [Path(r.path) for r in result]
 
     if not download_btn:
@@ -99,7 +99,7 @@ def google_img_update() -> Optional[List[Path]]:
 
     # 下載圖片
     try:
-        with st.spinner("獲取資料中..."):
+        with st.spinner(get_text('google_fetching_data')):
             all_exists = True
             results = fetcher.fetch(link, download_dir=UPDATE_DIR, recurse=False, only_list=True, preserve_structure=False)
             # 假如有獲取結果檢查是否有快取
@@ -123,14 +123,14 @@ def google_img_update() -> Optional[List[Path]]:
             
             results = fetcher.fetch(link, download_dir=UPDATE_DIR, recurse=False, preserve_structure=False)
     except Exception as e:
-        st.error(f"下載過程發生錯誤：{e}")
+        st.error(get_text('google_img_download_error').format(error=e))
         return None
     
-    st.success(f"下載完成 共 {len(results)} 張圖片")
+    st.success(get_text('google_img_download_complete').format(count=len(results)))
     
     # 壓縮圖片
     if IMAGE_COMPRESSOR:
-        with st.spinner("壓縮圖片中..."):
+        with st.spinner(get_text('google_img_compressing')):
             for r in results:
                 if r.size > MAX_COMPRESS_SIZE:
                     com_path = _get_compressed_path(r.path, r.path.suffix)
@@ -139,7 +139,7 @@ def google_img_update() -> Optional[List[Path]]:
                     r.path.unlink()
                     # 更新結果路徑
                     r.path = com_path
-            st.success(f"壓縮完成 共 {len(results)} 張圖片")
+            st.success(get_text('google_img_compress_complete').format(count=len(results)))
 
     # 儲存至連結緩存
     _set_cache(link, results)

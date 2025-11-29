@@ -9,6 +9,7 @@ import streamlit as st
 from config import (
     TEMP_DIR,
     switch_page,
+    get_text,
 )
 from utils.file import (
     clean_folder,
@@ -49,7 +50,7 @@ def handle_video_processing(
     with st.form("video_preview"):
         if video_path.exists():
             st.video(str(video_path))
-        st.form_submit_button("重新獲取影片 (假如未出現)")
+        st.form_submit_button(get_text('video_refetch'))
     
     intervals = video_intervals()
     
@@ -61,11 +62,11 @@ def handle_video_processing(
             region = canvas(frame)
                 
     col1, col2 = st.columns(2)
-    if col1.button("📤 開始處理影片"):
+    if col1.button(get_text('start_video_processing')):
         if not intervals:
-            st.error("請先設定時間區間")
+            st.error(get_text('video_interval_required'))
             return
-        st.success("🔍 開始處理影片 ... 請稍候")
+        st.success(get_text('video_processing_start'))
         stats = process_video(
             predictor=st.session_state.predictor,
             video_path=video_path,
@@ -88,11 +89,11 @@ def handle_video_processing(
             output_dir=output_dir,
         )
         st.session_state.video_results = stats
-        st.success("✅ 影片處理完成")
+        st.success(get_text('video_processing_complete'))
         
         switch_page("results")
 
-    if col2.button("🗑️ 清空影片結果"):
+    if col2.button(get_text('clear_video_results')):
         st.session_state.video_results = {}
         st.rerun()
         
@@ -104,10 +105,10 @@ def video_results():
     """
     stats_dict: Dict[str, IntervalStat] = st.session_state.get("video_results", {})
     if not stats_dict:
-        st.info("尚無影片處理結果")
+        st.info(get_text('no_video_results'))
         return
 
-    st.subheader("🎞️ 影片結果檢視")
+    st.subheader(get_text('video_results_title'))
     
     items: List[Tuple[str, IntervalStat]] = list(stats_dict.items())
     cards_per_row = 2
@@ -122,36 +123,36 @@ def video_results():
             key, iv = items[idx]
             with cols[i]:
                 # 標題與影片預覽
-                st.markdown(f"### ▶️ 片段：{key.replace('_', ' ')}  ({iv.start_s:.1f}s - {iv.end_s:.1f}s)")
+                st.markdown(f"### {get_text('video_segment_label')}: {key.replace('_', ' ')} ({iv.start_s:.1f}s - {iv.end_s:.1f}s)")
                 st.video(str(iv.file_path))
                 
                 with open(iv.file_path, 'rb') as f:
                     video_bytes = f.read()
                     st.download_button(
-                        label="⬇️ 下載影片",
+                        label=get_text('download_video'),
                         data=video_bytes,
                         file_name=os.path.basename(iv.file_path),
                         mime="video/mp4"
                     )
                 
-                with st.expander("🔍 查看統計數據", expanded=True):
+                with st.expander(get_text('view_stats'), expanded=True):
                     col1, col2 = st.columns(2)
                     with col1:
-                        st.metric("幀數", f"{iv.frame_count}")
-                        st.metric("開始時間", f"{iv.start_s:.1f} s")
-                        st.metric("結束時間", f"{iv.end_s:.1f} s")
+                        st.metric(get_text('frame_count'), f"{iv.frame_count}")
+                        st.metric(get_text('start_time'), f"{iv.start_s:.1f} s")
+                        st.metric(get_text('end_time'), f"{iv.end_s:.1f} s")
                     with col2:
-                        st.metric("最大出現秒數", f"{iv.max_at_s:.1f} s")
-                        st.metric("平均長度", f"{iv.mean_of_means_mm:.3f} mm")
-                        st.metric("最大長度", f"{iv.max_of_means_mm:.3f} mm")
+                        st.metric(get_text('max_occurrence_time'), f"{iv.max_at_s:.1f} s")
+                        st.metric(get_text('mean_length'), f"{iv.mean_of_means_mm:.3f} mm")
+                        st.metric(get_text('max_length'), f"{iv.max_of_means_mm:.3f} mm")
     
     
 # 下載區
 def video_downloads():
     if not st.session_state.video_results:
         return
-    st.subheader("💾 下載處理結果")
+    st.subheader(get_text('download_results'))
     buf_xl = generate_excel_video_results(st.session_state.video_results)
-    st.download_button("下載 Excel", buf_xl.getvalue(),
+    st.download_button(get_text('download_excel'), buf_xl.getvalue(),
                          "video_results.xlsx",
                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

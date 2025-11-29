@@ -8,6 +8,7 @@ from filelock import FileLock
 
 from .config import (
     DEFAULT_CONFIGS,
+    DEFAULT_CONFIG_KEY,
     STORAGE_KEY,
     STORAGE_DIR,
     CONFIG_FILE,
@@ -66,7 +67,7 @@ class FileStorageManager:
     def initialize_session_state(self):
         """初始化 session state 配置值"""
         if 'config_initialized' not in st.session_state:
-            default_config = self.default_configs['系統預設']
+            default_config = self.default_configs[DEFAULT_CONFIG_KEY]
             for key, value in default_config.items():
                 if key not in st.session_state:
                     st.session_state[key] = value
@@ -173,13 +174,13 @@ class FileStorageManager:
         """獲取當前的配置參數"""
         current_config_name = self.get_current_config_name()
         if current_config_name is None:
-            return DEFAULT_CONFIGS["系統預設"]
+            return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
         
         current_config = self.load_saved_configs().get(current_config_name, None)
         if not current_config:
             # 刪除不存在的設定
             self.delete_data(CURRENT_CONFIG_NAME)
-            return DEFAULT_CONFIGS["系統預設"]
+            return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
         
         session_dict = dict(st.session_state)
         
