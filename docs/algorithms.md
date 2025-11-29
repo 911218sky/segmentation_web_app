@@ -199,7 +199,7 @@ with torch.inference_mode():
 | `iou` | 0.1 | NMS 的 IoU 閾值 |
 | `batch` | 96 | 批次處理大小 |
 | `half` | True | FP16 半精度推論 |
-| `retina_masks` | True | 高解析度遮罩輸出 |
+| `retina\_masks` | True | 高解析度遮罩輸出 |
 
 ### 4.3 最高信心度分割選取
 
@@ -316,11 +316,11 @@ $$
 
 | 參數 | 預設值 | 說明 |
 |-----|--------|------|
-| `sample_interval` | 5 | x 軸採樣間隔（像素）|
-| `gradient_search_top` | 5 | 上邊界梯度搜尋範圍 |
-| `gradient_search_bottom` | 5 | 下邊界梯度搜尋範圍 |
-| `keep_ratio` | 0.3 | 中央區域保留比例 |
-| `window_size` | 5 | 平滑視窗大小 |
+| `sample\_interval` | 5 | x 軸採樣間隔（像素）|
+| `gradient\_search\_top` | 5 | 上邊界梯度搜尋範圍 |
+| `gradient\_search\_bottom` | 5 | 下邊界梯度搜尋範圍 |
+| `keep\_ratio` | 0.3 | 中央區域保留比例 |
+| `window\_size` | 5 | 平滑視窗大小 |
 | `threshold` | 0.1 | 過濾閾值 |
 
 ---
@@ -435,12 +435,12 @@ $$
 
 | 參數 | 預設值 | 說明 |
 |-----|--------|------|
-| `init_window` | 10 | 暖身期幀數 |
-| `init_cv_max` | 0.08 | 暖身期 CV 上限 |
-| `win_size` | 9 | 滑動視窗大小 |
-| `z_thresh` | 3.5 | 魯棒 z-score 門檻 |
-| `rel_tol` | 0.2 | 相對基線容忍範圍 |
-| `roc_abs_max` | 3.0 | 相鄰幀最大變化量 (mm) |
+| `init\_window` | 10 | 暖身期幀數 |
+| `init\_cv\_max` | 0.08 | 暖身期 CV 上限 |
+| `win\_size` | 9 | 滑動視窗大小 |
+| `z\_thresh` | 3.5 | 魯棒 z-score 門檻 |
+| `rel\_tol` | 0.2 | 相對基線容忍範圍 |
+| `roc\_abs\_max` | 3.0 | 相鄰幀最大變化量 (mm) |
 
 ### 6.8 演算法流程圖
 
@@ -490,7 +490,7 @@ $$
 d_i = |y_{bottom,i} - y_{top,i}| \times \text{pixel\_size\_mm}
 $$
 
-其中 `pixel_size_mm` 為超音波影像的像素尺寸（mm/pixel）。
+其中 `pixel\_size\_mm` 為超音波影像的像素尺寸（mm/pixel）。
 
 ### 7.2 統計指標
 
@@ -588,12 +588,12 @@ $$
 
 | 欄位 | 說明 |
 |-----|------|
-| `start_s` | 區間起始時間（秒）|
-| `end_s` | 區間結束時間（秒）|
-| `frame_count` | 處理的幀數 |
-| `mean_of_means_mm` | 逐幀平均值的平均（mm）|
-| `max_of_means_mm` | 逐幀平均值的最大（mm）|
-| `max_at_s` | 最大值對應的時間點（秒）|
+| `start\_s` | 區間起始時間（秒）|
+| `end\_s` | 區間結束時間（秒）|
+| `frame\_count` | 處理的幀數 |
+| `mean\_of\_means\_mm` | 逐幀平均值的平均（mm）|
+| `max\_of\_means\_mm` | 逐幀平均值的最大（mm）|
+| `max\_at\_s` | 最大值對應的時間點（秒）|
 
 ---
 
