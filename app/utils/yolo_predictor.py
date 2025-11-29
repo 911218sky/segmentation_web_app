@@ -14,7 +14,7 @@ current_dir = Path(__file__).resolve().parent.parent
 parent_dir = current_dir.parent
 sys.path.insert(0, str(parent_dir))
 
-from yolov12.ultralytics import YOLO
+from yolov13.ultralytics import YOLO
 
 class YOLOPredictor:
     """YOLO預測器類別"""

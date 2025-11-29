@@ -19,7 +19,7 @@ COPY wheels ./wheels
 COPY yolov13 ./yolov13
 COPY scripts ./scripts
 
-# 安裝系統依賴、Python 套件、安裝 yolov12，然後移除 build-time 套件與清理暫存
+# 安裝系統依賴、Python 套件、安裝 yolov13，然後移除 build-time 套件與清理暫存
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       build-essential git curl ca-certificates ffmpeg \
@@ -28,7 +28,7 @@ RUN apt-get update \
  && python -m pip install --upgrade pip setuptools wheel \
  && pip install --no-cache-dir -r requirements_yolo.txt \
  && pip install --no-cache-dir -r requirements.txt \
- && cd yolov12 && pip install --no-cache-dir -e . && cd .. \
+ && cd yolov13 && pip install --no-cache-dir -e . && cd .. \
  # 移除 build-only 套件與清理暫存
  && apt-get purge -y --auto-remove build-essential pkg-config libssl-dev libffi-dev \
  && rm -rf /var/lib/apt/lists/* /root/.cache/pip /app/wheels

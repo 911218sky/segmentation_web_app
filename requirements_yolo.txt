@@ -2,4 +2,6 @@ pycocotools==2.0.7
 huggingface-hub==0.23.2
 psutil==5.9.8
 thop
+
+# yolov13 flash attention
 wheels/flash_attn-2.8.2+cu12torch2.7cxx11abiFALSE-cp311-cp311-linux_x86_64.whl

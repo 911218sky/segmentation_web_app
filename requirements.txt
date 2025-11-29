@@ -10,4 +10,5 @@ google_api_python_client~=2.179.0
 openpyxl
 xlsxwriter
 
+# streamlit_drawable_canvas
 wheels/streamlit_drawable_canvas-0.9.3-py3-none-any.whl

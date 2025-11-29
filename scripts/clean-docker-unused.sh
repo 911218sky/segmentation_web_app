@@ -5,21 +5,21 @@ set -euo pipefail
 IFS=$'\n\t'
 
 DRY_RUN=false
-FORCE=false
 AGGRESSIVE=false
+FULL_PRUNE=false
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=true ;;
-    --yes)     FORCE=true ;;
     --aggressive) AGGRESSIVE=true ;;
+    --full-prune) FULL_PRUNE=true ;;
     -h|--help)
       cat <<EOF
-Usage: $0 [--dry-run] [--yes] [--aggressive]
+Usage: $0 [--dry-run] [--aggressive] [--full-prune]
 
 --dry-run     只顯示會做的動作（不刪除）
---yes         不要求確認，直接執行
 --aggressive  額外移除所有未被任何 container 使用的影像（images）
+--full-prune  最後額外再跑一次 docker system prune --volumes -f（清理所有未被使用的資源）
 EOF
       exit 0
       ;;
@@ -126,14 +126,6 @@ fi
 echo
 
 # 確認（除非 --yes 或 --dry-run）
-if [ "$FORCE" = false ] && [ "$DRY_RUN" = false ]; then
-  read -r -p "確定要繼續清除上述「沒被使用」的資源嗎？輸入 y 繼續： " ans
-  case "$ans" in
-    y|Y) ;;
-    *) echo "已取消。" ; exit 0 ;;
-  esac
-fi
-
 # dry-run 模式只顯示要做的事
 if [ "$DRY_RUN" = true ]; then
   echo "[DRY-RUN] 將會刪除以下資源（若有）："
@@ -143,6 +135,9 @@ if [ "$DRY_RUN" = true ]; then
   [ "$unused_networks_cnt" -gt 0 ] && printf "  Will remove unused networks:\n%s\n" "$unused_networks"
   [ "$AGGRESSIVE" = true ] && [ "$unused_images_cnt" -gt 0 ] && printf "  Will remove unused images (IDs):\n%s\n" "$unused_images"
   echo "[DRY-RUN] 並會執行 docker builder prune -f 清理 build cache（若有可清除項目）"
+  if [ "$FULL_PRUNE" = true ]; then
+    echo "[DRY-RUN] 並會執行 docker system prune --volumes -f（再清一次所有未被使用的資源）"
+  fi
   exit 0
 fi
 
@@ -178,5 +173,18 @@ fi
 # Builder cache prune（非破壞性）
 echo "執行 docker builder prune -f（清理 build cache）..."
 docker builder prune -f || true
+
+if [ "$FULL_PRUNE" = true ]; then
+  echo "額外執行 docker system prune --volumes -f（確保全部未使用的資源都被清乾淨）..."
+  docker system prune --volumes -f || true
+fi
+
+# Buildx cache prune if available
+if docker buildx version >/dev/null 2>&1; then
+  echo "執行 docker buildx prune --all --force（清理 buildx cache）..."
+  docker buildx prune --all --force || true
+else
+  echo "docker buildx plugin 尚未安裝或不可用，跳過 buildx 清理。"
+fi
 
 echo "清理完成。"
