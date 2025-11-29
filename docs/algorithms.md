@@ -206,7 +206,8 @@ with torch.inference_mode():
 當單張影像偵測到多個血管區域時，系統自動選取信心度最高的分割結果：
 
 $$
-\mathrm{mask}^* = \mathrm{mask}_{k^*}, \quad k^* = \underset{k}{\arg\max} \ \mathrm{conf}_k
+k_{\text{best}} = \arg\max_{k} \mathrm{conf}_k, \quad
+\mathrm{mask}_{\text{best}} = \mathrm{mask}_{k_{\text{best}}}
 $$
 
 ---
