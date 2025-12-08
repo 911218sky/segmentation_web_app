@@ -181,14 +181,18 @@ class FileStorageManager:
             # 刪除不存在的設定
             self.delete_data(CURRENT_CONFIG_NAME)
             return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
-        
-        session_dict = dict(st.session_state)
-        
-        # 獲取目前設定，優先使用 current_config 的數值，沒有則使用 session_dict 的數值
-        for key, default in current_config.items():
-            session_dict[key] = default
-        
-        return session_dict
+
+        allowed_keys = set(DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].keys())
+        sanitized_config = {}
+        default_config = DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
+
+        for key in allowed_keys:
+            sanitized_config[key] = st.session_state.get(
+                key,
+                current_config.get(key, default_config.get(key))
+            )
+
+        return sanitized_config
 
     def get_current_config_name(self):
         """獲取當前的設定名稱"""
