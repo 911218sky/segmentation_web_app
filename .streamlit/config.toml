@@ -1,26 +1,21 @@
-[global]
-# 關閉開發模式（生產必備）
-developmentMode = false
-
 [server]
-# 你原本的設定
-runOnSave = false
-maxUploadSize = 20
-
-# 生產建議
-headless = true
-fileWatcherType = "none"      # 停用檔案監控避免自動 reload（生產）
-baseUrlPath = ""              # 若放在子路徑 proxy，填 "/myapp"（否則留空）
-
-# 安全性：啟用 XSRF 保護
-enableXsrfProtection = true
-# 為了讓 XSRF 機制可正常運作（cookie + origin），將 CORS 設為 true
+# 開發環境配置
+port = 3012
+address = "localhost"
+runOnSave = true
+fileWatcherType = "auto"
+headless = false
 enableCORS = true
-
-enableWebsocketCompression = true
+enableXsrfProtection = false
+maxUploadSize = 20
+allowRunOnSave = true
+enableStaticServing = false
 
 [logger]
 level = "info"
 
 [browser]
-gatherUsageStats = false
+# 開發環境瀏覽器配置
+gatherUsageStats = true
+serverAddress = "localhost"
+serverPort = 3012

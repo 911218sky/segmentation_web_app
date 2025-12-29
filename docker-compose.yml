@@ -1,11 +1,6 @@
 services:
   vessel:
-    build:
-      context: .
-      args:
-        USER_ID: ${HOST_UID:-1000}
-        GROUP_ID: ${HOST_GID:-1000}
-    image: sky1218/vessel-measure:latest
+    image: ghcr.io/911218sky/segmentation_web_app:latest
     container_name: vessel_measure
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     ports:
@@ -13,11 +8,10 @@ services:
     volumes:
       - ./user_configs:/app/user_configs
       - ./temp:/app/temp
-      - ./app:/app/app:ro
-      - ./scripts:/app/scripts:ro
       - ./secrets:/app/secrets:ro
-      - ./.streamlit:/app/.streamlit:ro
-      - ./models:/app/models:ro
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
     restart: unless-stopped
     deploy:
       resources:
@@ -25,4 +19,5 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: ["gpu"]
+              capabilities: [gpu]
+

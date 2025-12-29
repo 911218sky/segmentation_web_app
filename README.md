@@ -1,118 +1,163 @@
-# 🩺 Vessel Measurement Tool v0.2
-A cutting-edge vessel measurement tool powered by YOLOv12 and Streamlit, designed for advanced medical image analysis to automatically detect and measure vessel dimensions in ultrasound images with superior accuracy and real-time performance.
+# 🩺 Vessel Measurement Tool
 
-## 🛠️ System Requirements
-- Python Version: `>=3.11`
-- CUDA (Optional): Support for GPU acceleration
+A vessel measurement tool powered by YOLOv13 and Streamlit for automatic detection and measurement in ultrasound images.
 
-## 🔧 Google Cloud Service Account Setup
+## 🛠️ Requirements
+
+- Python: `>=3.11`
+- CUDA: GPU acceleration support (optional)
+- Docker: Recommended for deployment
+
+## � Docker Deployment (Recommended)
 
 ### Prerequisites
-Before setting up the service, ensure you have:
-- A Google Cloud Console account
 
-### Step-by-Step Configuration
+- Docker with NVIDIA Container Toolkit installed
+- NVIDIA GPU with CUDA support
 
-#### 1. Access Google Cloud Console
-- Log in to [Google Cloud Console](https://console.cloud.google.com/)
-- Select an existing project or create a new one for your operations
+### Quick Start
 
-#### 2. Enable Required APIs
-If your application needs to access specific APIs (e.g., Google Drive API):
-- Navigate to **APIs & Services → Library**
-- Search for and enable the required APIs (e.g., "Drive API")
-- Click **Enable** for each required API
+```bash
+# Pull the image
+docker pull ghcr.io/911218sky/segmentation_web_app:latest
 
-#### 3. Create Service Account
-- Go to **IAM & Admin → Service Accounts**
-- Click **+ Create Service Account**
-- Enter a descriptive **name** and **description** for the service account
-- Click **Create and Continue**
+# Create required directories
+mkdir -p user_configs temp secrets
 
-#### 4. Assign Permissions
-- **(Recommended)** Follow the principle of least privilege
-- Assign only the minimum necessary permissions for your application
-- You can specify roles during creation or adjust them later in the IAM section
-- Click **Continue** then **Done**
+# Run with docker compose
+docker compose up -d
+```
 
-#### 5. Generate Service Account Key
-- Click on the newly created service account from the list
-- Navigate to the **Keys** tab
-- Click **Add Key → Create new key**
-- Select **JSON** format
-- Click **Create**
+### Manual Docker Run
 
-**Important**: The browser will automatically download a `.json` file. This is the **only opportunity** to download the private key - Google only provides the original private key at creation time.
+```bash
+docker run -d \
+  --name vessel_measure \
+  --gpus all \
+  -p 3015:8501 \
+  -v ./user_configs:/app/user_configs \
+  -v ./temp:/app/temp \
+  -v ./secrets:/app/secrets:ro \
+  ghcr.io/911218sky/segmentation_web_app:latest
+```
 
-#### 6. Secure the Key File
-After downloading the JSON key file:
+### Docker Scripts
 
-1. **Create the secrets directory** in your project root:
-   ```bash
-   mkdir -p secrets
-   ```
+```bash
+# Start service (foreground)
+./scripts/docker/start.sh
 
-2. **Rename and move the downloaded JSON file**:
-   ```bash
-   # Replace 'your-project-name-xxxxx.json' with your actual downloaded filename
-   mv ~/Downloads/your-project-name-xxxxx.json secrets/service-account.json
-   ```
+# Start service (background)
+./scripts/docker/start.sh background
 
-## 📦 Installation
+# Clean Docker resources
+./scripts/docker/clean.sh
 
-### 1. Clone the Project
+# Clean aggressively (remove all unused images)
+./scripts/docker/clean.sh --aggressive
+```
+
+Access the application at: http://localhost:3015
+
+## 💻 Local Development
+
+### 1. Clone Repository
+
 ```bash
 git clone --recursive https://github.com/911218sky/segmentation_web_app.git
 cd segmentation_web_app
 ```
 
-### 2. Create Virtual Environment (Recommended)
+### 2. Create Virtual Environment
+
 ```bash
+# Using conda (recommended)
 conda create -p venv python=3.11
 conda activate ./venv
+
+# Or using venv
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
 ```
 
-### 3. Download Required Resources
-Download the model files and wheels from the GitHub release:
+### 3. Download Resources
+
+Download model files and wheels from GitHub Release:
+
 ```bash
-# Download models.tar.gz and wheels.tar.gz from GitHub release
-wget https://github.com/911218sky/segmentation_web_app/releases/download/v2/models.tar.gz
-wget https://github.com/911218sky/segmentation_web_app/releases/download/v2/wheels.tar.gz
-tar -xzf models.tar.gz
-tar -xzf wheels.tar.gz
+# Download from latest release
+wget https://github.com/911218sky/segmentation_web_app/releases/latest/download/models.zip
+wget https://github.com/911218sky/segmentation_web_app/releases/latest/download/wheels.zip
+
+# Extract
+unzip models.zip
+unzip wheels.zip
 ```
 
-**Alternative**: Manual download
-- Visit [Release v2](https://github.com/911218sky/segmentation_web_app/releases/tag/v2)
-- Download `models.tar.gz` and `wheels.tar.gz`
-- Place the files in the project root directory
+Or manually download from [Releases](https://github.com/911218sky/segmentation_web_app/releases).
 
 ### 4. Install Dependencies
+
 ```bash
-# Install PyTorch with CUDA support (recommended)
+# Install PyTorch with CUDA support
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# Install YOLOv12 requirements
+# Install YOLO requirements
 pip install -r requirements_yolo.txt
 
 # Install application dependencies
 pip install -r requirements.txt
 
 # Install YOLOv13 in development mode
-cd ./yolov13
-pip install -e .
-cd ..
+cd yolov13 && pip install -e . && cd ..
 ```
 
-## 🚀 Usage Guide
+### 5. Run Application
 
-### Launch Application
 ```bash
+# Using script
+./scripts/local/dev.sh
+
+# Or directly
 streamlit run app/main.py
 ```
 
-**Important Notes**:
-- Ensure all installation steps are completed before running the application
-- Verify that `secrets/service-account.json` is properly configured if using Google Cloud services
-- For GPU acceleration, make sure CUDA-enabled PyTorch is properly installed
-- Model files require several GB of disk space, ensure sufficient storage capacity
+Access the application at: http://localhost:8501
+
+## 📁 Project Structure
+
+```
+scripts/
+├── local/              # Local development
+│   └── dev.sh          # Start local dev server
+├── docker/             # Docker operations
+│   ├── start.sh        # Start Docker service
+│   └── clean.sh        # Clean Docker resources
+├── ci/                 # CI/CD
+│   └── release.sh      # Publish GitHub Release
+└── internal/           # Container internal (do not run directly)
+    ├── entrypoint.sh
+    └── web.sh
+```
+
+## 🔧 Google Cloud Setup (Optional)
+
+Required for Google Drive integration:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project and enable Drive API
+3. Create a Service Account and download JSON key
+4. Place the key file:
+
+```bash
+mkdir -p secrets
+mv ~/Downloads/your-key.json secrets/service-account.json
+```
+
+## 📝 Notes
+
+- Model files are large, ensure sufficient disk space
+- GPU acceleration requires CUDA-enabled PyTorch
+- Docker deployment requires NVIDIA Container Toolkit
+- Default port: 8501 (local) / 3015 (Docker)

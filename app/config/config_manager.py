@@ -67,6 +67,19 @@ class FileStorageManager:
     def initialize_session_state(self):
         """初始化 session state 配置值"""
         if 'config_initialized' not in st.session_state:
+            # 優先載入用戶已保存的當前配置
+            current_config_name = self.get_current_config_name()
+            if current_config_name:
+                saved_configs = self.load_saved_configs()
+                config_to_apply = saved_configs.get(current_config_name, None)
+                if config_to_apply:
+                    for key, value in config_to_apply.items():
+                        if key not in st.session_state:
+                            st.session_state[key] = value
+                    st.session_state.config_initialized = True
+                    return
+            
+            # 如果沒有保存的配置，使用預設配置
             default_config = self.default_configs[DEFAULT_CONFIG_KEY]
             for key, value in default_config.items():
                 if key not in st.session_state:
@@ -174,25 +187,35 @@ class FileStorageManager:
         """獲取當前的配置參數"""
         current_config_name = self.get_current_config_name()
         if current_config_name is None:
-            return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
+            return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].copy()
         
         current_config = self.load_saved_configs().get(current_config_name, None)
         if not current_config:
             # 刪除不存在的設定
             self.delete_data(CURRENT_CONFIG_NAME)
-            return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
-
-        allowed_keys = set(DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].keys())
-        sanitized_config = {}
-        default_config = DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY]
-
-        for key in allowed_keys:
-            sanitized_config[key] = st.session_state.get(
-                key,
-                current_config.get(key, default_config.get(key))
-            )
-
-        return sanitized_config
+            return DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].copy()
+        
+        # 只提取可序列化的配置 key（基於 DEFAULT_CONFIGS 定義的 key）
+        valid_keys = set(DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].keys())
+        result_config = {}
+        
+        # 優先從 session_state 獲取值，若不存在則使用 current_config 的值
+        for key in valid_keys:
+            if key in st.session_state:
+                value = st.session_state[key]
+                # 確保值是可 JSON 序列化的基本類型
+                if isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                    result_config[key] = value
+                elif key in current_config:
+                    result_config[key] = current_config[key]
+                else:
+                    result_config[key] = DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].get(key)
+            elif key in current_config:
+                result_config[key] = current_config[key]
+            else:
+                result_config[key] = DEFAULT_CONFIGS[DEFAULT_CONFIG_KEY].get(key)
+        
+        return result_config
 
     def get_current_config_name(self):
         """獲取當前的設定名稱"""
