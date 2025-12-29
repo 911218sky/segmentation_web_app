@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Docker 容器入口點
-# 由 Dockerfile CMD 呼叫
+# Docker Container Entrypoint
+# Called by Dockerfile CMD
 
 bash /app/scripts/internal/web.sh
