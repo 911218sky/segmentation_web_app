@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.7.1-cuda12.6-cudnn9-runtime
+FROM sky1218/pytorch:2.7.1-cuda12.8-py3.11
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
