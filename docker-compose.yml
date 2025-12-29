@@ -6,6 +6,9 @@ services:
     ports:
       - "3015:8501"
     volumes:
+      - ./app:/app/app:ro
+      - ./scripts:/app/scripts:ro
+      - ./.streamlit:/app/.streamlit:ro
       - ./user_configs:/app/user_configs
       - ./temp:/app/temp
       - ./secrets:/app/secrets:ro
