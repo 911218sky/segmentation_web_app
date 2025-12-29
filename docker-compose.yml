@@ -1,6 +1,6 @@
 services:
   vessel:
-    image: ghcr.io/911218sky/segmentation_web_app:latest
+    image: sky1218/vessel-measure:latest
     container_name: vessel_measure
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     ports:

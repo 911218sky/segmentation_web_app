@@ -4,7 +4,7 @@ port = 3012
 address = "localhost"
 runOnSave = true
 fileWatcherType = "auto"
-headless = false
+headless = true
 enableCORS = true
 enableXsrfProtection = false
 maxUploadSize = 20
@@ -16,6 +16,6 @@ level = "info"
 
 [browser]
 # 開發環境瀏覽器配置
-gatherUsageStats = true
+gatherUsageStats = false
 serverAddress = "localhost"
 serverPort = 3012
